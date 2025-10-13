@@ -12,7 +12,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>📊 Control de Asistencia </h1>
+            <h1>📊 Control de Asistencia</h1>
             <p>CIFP USURBIL - 1DDAW3 Web Aplikazioen Garapena</p>
             <div class="db-status" id="db-status">
                 <span class="status-indicator" id="status-indicator">●</span>
@@ -91,6 +91,24 @@
                 <!-- Lista de faltas se generará dinámicamente -->
             </div>
         </section>
+
+        <!-- Modal para configuración Firebase -->
+        <div id="firebase-modal" class="modal">
+            <div class="modal-content">
+                <h3>🔧 Configuración Firebase</h3>
+                <p>Para usar la aplicación, necesitas configurar Firebase:</p>
+                <div class="form-group">
+                    <label>API Key:</label>
+                    <input type="text" id="api-key" placeholder="Tu API Key de Firebase">
+                </div>
+                <div class="form-group">
+                    <label>Project ID:</label>
+                    <input type="text" id="project-id" placeholder="Tu Project ID">
+                </div>
+                <button id="btn-guardar-config" class="btn-primary">Guardar Configuración</button>
+                <p><small>¿No tienes Firebase? <a href="#pasos-firebase">Sigue estos pasos</a></small></p>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

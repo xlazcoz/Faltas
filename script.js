@@ -12,16 +12,6 @@ const config = {
     limitePorcentaje: 20
 };
 
-// CONFIGURACIÓN FIREBASE FIJA - NO SE PIDE AL USUARIO
-const firebaseConfig = {
-    apiKey: "AIzaSyBfjIsR9WP5Sud02hgJT8ppoxYHiUAThRE",
-    authDomain: "falta-szubieta.firebaseapp.com",
-    projectId: "falta-szubieta",
-    storageBucket: "falta-szubieta.firebasestorage.app",
-    messagingSenderId: "1096789382482",
-    appId: "1:1096789382482:web:2d4d7d6d8f6e6b7c9c0a9a"
-};
-
 // Variables globales
 let db = null;
 let faltas = [];
@@ -41,12 +31,33 @@ const asignaturasRiesgoElement = document.getElementById('asignaturas-riesgo');
 const totalRegistrosElement = document.getElementById('total-registros');
 const statusIndicator = document.getElementById('status-indicator');
 const statusText = document.getElementById('status-text');
+const firebaseModal = document.getElementById('firebase-modal');
+const btnGuardarConfig = document.getElementById('btn-guardar-config');
 
 // Establecer fecha actual por defecto
 fechaInput.valueAsDate = new Date();
 
-// Inicializar Firebase automáticamente
+// Configuración de Firebase
+let firebaseConfig = {
+    apiKey: localStorage.getItem('firebase_apiKey') || '',
+    authDomain: localStorage.getItem('firebase_authDomain') || '',
+    projectId: localStorage.getItem('firebase_projectId') || '',
+    storageBucket: localStorage.getItem('firebase_storageBucket') || '',
+    messagingSenderId: localStorage.getItem('firebase_messagingSenderId') || '',
+    appId: localStorage.getItem('firebase_appId') || ''
+};
+
+// Inicializar Firebase
 function inicializarFirebase() {
+    // Verificar si la configuración está completa
+    const configCompleta = firebaseConfig.apiKey && firebaseConfig.projectId;
+    
+    if (!configCompleta) {
+        mostrarModalConfiguracion();
+        updateStatus('Configuración Firebase requerida', 'error');
+        return false;
+    }
+
     try {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
@@ -56,8 +67,18 @@ function inicializarFirebase() {
     } catch (error) {
         console.error('Error inicializando Firebase:', error);
         updateStatus('Error conectando a Firebase', 'error');
+        mostrarModalConfiguracion();
         return false;
     }
+}
+
+// Mostrar modal de configuración
+function mostrarModalConfiguracion() {
+    firebaseModal.style.display = 'block';
+    
+    // Llenar campos si hay valores guardados
+    document.getElementById('api-key').value = firebaseConfig.apiKey || '';
+    document.getElementById('project-id').value = firebaseConfig.projectId || '';
 }
 
 // Cargar faltas desde Firebase
@@ -137,10 +158,47 @@ async function limpiarBaseDeDatosFirebase() {
 btnRegistrar.addEventListener('click', registrarFalta);
 btnLimpiar.addEventListener('click', limpiarBaseDeDatosCompleta);
 btnExportar.addEventListener('click', exportarDatos);
+btnGuardarConfig.addEventListener('click', guardarConfiguracionFirebase);
 
 document.querySelectorAll('.btn-filter').forEach(btn => {
     btn.addEventListener('click', (e) => filtrarTabla(e.target.dataset.filter));
 });
+
+// Cerrar modal al hacer clic fuera
+window.addEventListener('click', (event) => {
+    if (event.target === firebaseModal) {
+        firebaseModal.style.display = 'none';
+    }
+});
+
+// Guardar configuración Firebase
+function guardarConfiguracionFirebase() {
+    const apiKey = document.getElementById('api-key').value.trim();
+    const projectId = document.getElementById('project-id').value.trim();
+
+    if (!apiKey || !projectId) {
+        alert('Por favor, completa todos los campos de configuración');
+        return;
+    }
+
+    // Guardar en localStorage
+    localStorage.setItem('firebase_apiKey', apiKey);
+    localStorage.setItem('firebase_projectId', projectId);
+    
+    // Actualizar configuración
+    firebaseConfig.apiKey = apiKey;
+    firebaseConfig.projectId = projectId;
+    
+    // Cerrar modal y reinicializar
+    firebaseModal.style.display = 'none';
+    
+    // Reiniciar Firebase
+    if (firebase.apps.length > 0) {
+        firebase.app().delete();
+    }
+    
+    inicializarFirebase();
+}
 
 // Funciones principales
 async function registrarFalta() {
@@ -218,7 +276,7 @@ function exportarDatos() {
     mostrarNotificacion('Datos exportados correctamente', 'success');
 }
 
-// Resto de funciones se mantienen igual
+// Resto de funciones se mantienen igual (calcularEstadisticasAsignatura, actualizarUI, etc.)
 function calcularEstadisticasAsignatura(asignaturaKey) {
     const configAsignatura = config.asignaturas[asignaturaKey];
     const faltasAsignatura = faltas.filter(f => f.asignatura === asignaturaKey);
