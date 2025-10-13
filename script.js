@@ -218,6 +218,36 @@ function exportarDatos() {
     mostrarNotificacion('Datos exportados correctamente', 'success');
 }
 
+// FUNCIÓN DE NOTIFICACIONES RECUPERADA
+function mostrarNotificacion(mensaje, tipo) {
+    const notificacion = document.createElement('div');
+    notificacion.textContent = mensaje;
+    notificacion.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        z-index: 1000;
+        transition: opacity 0.3s;
+        background: ${tipo === 'success' ? '#16a34a' : '#dc2626'};
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+    
+    document.body.appendChild(notificacion);
+    
+    setTimeout(() => {
+        notificacion.style.opacity = '0';
+        setTimeout(() => {
+            if (document.body.contains(notificacion)) {
+                document.body.removeChild(notificacion);
+            }
+        }, 300);
+    }, 3000);
+}
+
 // Resto de funciones se mantienen igual
 function calcularEstadisticasAsignatura(asignaturaKey) {
     const configAsignatura = config.asignaturas[asignaturaKey];
@@ -410,32 +440,6 @@ function updateStatus(message, type) {
             statusIndicator.classList.add('status-error');
             break;
     }
-}
-
-function mostrarNotificacion(mensaje, tipo) {
-    const notificacion = document.createElement('div');
-    notificacion.textContent = mensaje;
-    notificacion.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 12px 20px;
-        border-radius: 8px;
-        color: white;
-        font-weight: 600;
-        z-index: 1000;
-        transition: opacity 0.3s;
-        background: ${tipo === 'success' ? '#16a34a' : '#dc2626'};
-    `;
-    
-    document.body.appendChild(notificacion);
-    
-    setTimeout(() => {
-        notificacion.style.opacity = '0';
-        setTimeout(() => {
-            document.body.removeChild(notificacion);
-        }, 300);
-    }, 3000);
 }
 
 // Inicializar la aplicación cuando se carga la página
