@@ -45,29 +45,6 @@ const statusText = document.getElementById('status-text');
 // Establecer fecha actual por defecto
 fechaInput.valueAsDate = new Date();
 
-// FUNCIÓN DE NOTIFICACIONES MEJORADA
-function mostrarNotificacion(mensaje, tipo) {
-    console.log('Mostrando notificación:', mensaje, tipo);
-    
-    // Crear elemento de notificación
-    const notificacion = document.createElement('div');
-    notificacion.className = `notificacion ${tipo}`;
-    notificacion.textContent = mensaje;
-    
-    // Añadir al body
-    document.body.appendChild(notificacion);
-    
-    // Eliminar después de 3 segundos con animación
-    setTimeout(() => {
-        notificacion.style.animation = 'slideOut 0.3s ease-in forwards';
-        setTimeout(() => {
-            if (document.body.contains(notificacion)) {
-                document.body.removeChild(notificacion);
-            }
-        }, 300);
-    }, 3000);
-}
-
 // Inicializar Firebase automáticamente
 function inicializarFirebase() {
     try {
@@ -172,7 +149,7 @@ async function registrarFalta() {
     const horas = parseInt(horasInput.value);
 
     if (!fecha || !asignatura) {
-        mostrarNotificacion('Por favor, completa todos los campos', 'error');
+        alert('Por favor, completa todos los campos');
         return;
     }
 
@@ -191,11 +168,10 @@ async function registrarFalta() {
         asignaturaSelect.value = '';
         horasInput.value = '2';
         
-        // NOTIFICACIÓN DE ÉXITO
-        mostrarNotificacion('✅ Falta registrada y sincronizada', 'success');
+        mostrarNotificacion('Falta registrada y sincronizada', 'success');
     } catch (error) {
         console.error('Error al registrar falta:', error);
-        mostrarNotificacion('❌ Error al registrar falta', 'error');
+        mostrarNotificacion('Error al registrar falta', 'error');
     }
 }
 
@@ -203,10 +179,10 @@ async function eliminarFalta(id) {
     if (confirm('¿Estás seguro de que quieres eliminar esta falta?')) {
         try {
             await eliminarFaltaDeFirebase(id);
-            mostrarNotificacion('✅ Falta eliminada', 'success');
+            mostrarNotificacion('Falta eliminada', 'success');
         } catch (error) {
             console.error('Error al eliminar falta:', error);
-            mostrarNotificacion('❌ Error al eliminar falta', 'error');
+            mostrarNotificacion('Error al eliminar falta', 'error');
         }
     }
 }
@@ -215,10 +191,10 @@ async function limpiarBaseDeDatosCompleta() {
     if (confirm('¿Estás seguro de que quieres eliminar TODOS los registros? Esta acción no se puede deshacer.')) {
         try {
             await limpiarBaseDeDatosFirebase();
-            mostrarNotificacion('✅ Base de datos limpiada', 'success');
+            mostrarNotificacion('Base de datos limpiada', 'success');
         } catch (error) {
             console.error('Error al limpiar base de datos:', error);
-            mostrarNotificacion('❌ Error al limpiar base de datos', 'error');
+            mostrarNotificacion('Error al limpiar base de datos', 'error');
         }
     }
 }
@@ -239,7 +215,7 @@ function exportarDatos() {
     a.click();
     URL.revokeObjectURL(url);
     
-    mostrarNotificacion('✅ Datos exportados correctamente', 'success');
+    mostrarNotificacion('Datos exportados correctamente', 'success');
 }
 
 // Resto de funciones se mantienen igual
@@ -434,6 +410,32 @@ function updateStatus(message, type) {
             statusIndicator.classList.add('status-error');
             break;
     }
+}
+
+function mostrarNotificacion(mensaje, tipo) {
+    const notificacion = document.createElement('div');
+    notificacion.textContent = mensaje;
+    notificacion.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        z-index: 1000;
+        transition: opacity 0.3s;
+        background: ${tipo === 'success' ? '#16a34a' : '#dc2626'};
+    `;
+    
+    document.body.appendChild(notificacion);
+    
+    setTimeout(() => {
+        notificacion.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(notificacion);
+        }, 300);
+    }, 3000);
 }
 
 // Inicializar la aplicación cuando se carga la página
