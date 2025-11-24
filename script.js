@@ -1,10 +1,10 @@
 // Configuración de asignaturas
 const config = {
     asignaturas: {
-        "Mar": { horasTotales: 114, horasTrimestre: 46, nombreCompleto: "Markatze Lengoaiak" },
-        "Gar": { horasTotales: 85, horasTrimestre: 34, nombreCompleto: "Garapena" },
-        "BBDD": { horasTotales: 170, horasTrimestre: 66, nombreCompleto: "Datu-baseak" },
-        "Prog": { horasTotales: 228, horasTrimestre: 90, nombreCompleto: "Programazioa" },
+        "Mar": { horasTotales: 114, horasTrimestre: 42, nombreCompleto: "Markatze Lengoaiak" },
+        "Gar": { horasTotales: 85, horasTrimestre: 32, nombreCompleto: "Garapena" },
+        "BBDD": { horasTotales: 170, horasTrimestre: 62, nombreCompleto: "Datu-baseak" },
+        "Prog": { horasTotales: 228, horasTrimestre: 86, nombreCompleto: "Programazioa" },
         "Ingles": { horasTotales: 60, horasTrimestre: 24, nombreCompleto: "Ingeles Teknikoa" },
         "Digi": { horasTotales: 58, horasTrimestre: 24, nombreCompleto: "Digitalizazioa" },
         "Irau": { horasTotales: 29, horasTrimestre: 12, nombreCompleto: "Iraunkortasuna" }
