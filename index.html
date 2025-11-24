@@ -5,9 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Control de Asistencia - CIFP USURBIL</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        /* Estilo simple para las pestañas de evaluación */
+        .eval-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            padding: 8px 20px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #64748b;
+            transition: all 0.3s ease;
+        }
+        .tab-btn.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -16,13 +40,22 @@
             <p>CIFP USURBIL - 1DDAW3 Web Aplikazioen Garapena</p>
             <div class="db-status" id="db-status">
                 <span class="status-indicator" id="status-indicator">●</span>
-                <span id="status-text">Conectando a Firebase...</span>
+                <span id="status-text">Conectando...</span>
             </div>
         </header>
 
         <section class="registro-faltas">
             <h2>Registrar Falta</h2>
             <div class="form-container">
+                <div class="form-group">
+                    <label for="evaluacion-input">Evaluación:</label>
+                    <select id="evaluacion-input" required>
+                        <option value="1">1ª Evaluación</option>
+                        <option value="2">2ª Evaluación</option>
+                        <option value="3">3ª Evaluación</option>
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label for="fecha">Fecha:</label>
                     <input type="date" id="fecha" required>
@@ -41,72 +74,70 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="horas">Horas de falta:</label>
+                    <label for="horas">Horas:</label>
                     <input type="number" id="horas" min="1" max="8" value="2" required>
                 </div>
-                <button id="btn-registrar" class="btn-primary">Registrar Falta</button>
+                <button id="btn-registrar" class="btn-primary">Registrar</button>
             </div>
         </section>
 
         <section class="resumen-asistencia">
             <h2>Resumen de Asistencia</h2>
+            
+            <div class="eval-tabs">
+                <button class="tab-btn active" onclick="cambiarEvaluacion(1)" id="tab-1">1ª Eval</button>
+                <button class="tab-btn" onclick="cambiarEvaluacion(2)" id="tab-2">2ª Eval</button>
+                <button class="tab-btn" onclick="cambiarEvaluacion(3)" id="tab-3">3ª Eval</button>
+            </div>
+
             <div class="filtros">
                 <button class="btn-filter active" data-filter="all">Todas</button>
-                <button class="btn-filter" data-filter="warning">Advertencias</button>
+                <button class="btn-filter" data-filter="warning">Riesgo</button>
                 <button class="btn-filter" data-filter="danger">Peligro</button>
             </div>
+
             <div id="tabla-resumen" class="tabla-container">
-                <!-- La tabla se generará dinámicamente -->
-            </div>
+                </div>
         </section>
 
         <section class="estadisticas">
             <div class="stats-grid">
                 <div class="stat-card">
-                    <h3>Total Horas Registradas</h3>
+                    <h3>Total Horas (Eval Actual)</h3>
                     <p id="total-horas">0</p>
                 </div>
                 <div class="stat-card">
-                    <h3>Total Faltas</h3>
+                    <h3>Faltas (Eval Actual)</h3>
                     <p id="total-faltas">0</p>
                 </div>
                 <div class="stat-card">
-                    <h3>Asignaturas en Riesgo</h3>
+                    <h3>En Riesgo</h3>
                     <p id="asignaturas-riesgo">0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Registros en Cloud</h3>
-                    <p id="total-registros">0</p>
                 </div>
             </div>
         </section>
 
         <section class="lista-faltas">
-            <h2>Historial de Faltas</h2>
+            <h2>Historial (Evaluación Actual)</h2>
             <div class="acciones-lista">
-                <button id="btn-exportar" class="btn-secondary">Exportar a JSON</button>
-                <button id="btn-limpiar" class="btn-secondary">Limpiar Base de Datos</button>
+                <button id="btn-exportar" class="btn-secondary">Exportar JSON</button>
+                <button id="btn-limpiar" class="btn-secondary">Limpiar BD</button>
             </div>
-            <div id="lista-faltas-container">
-                <!-- Lista de faltas se generará dinámicamente -->
-            </div>
+            <div id="lista-faltas-container"></div>
         </section>
 
-        <!-- Modal para configuración Firebase -->
         <div id="firebase-modal" class="modal">
             <div class="modal-content">
                 <h3>🔧 Configuración Firebase</h3>
-                <p>Para usar la aplicación, necesitas configurar Firebase:</p>
                 <div class="form-group">
                     <label>API Key:</label>
-                    <input type="text" id="api-key" placeholder="Tu API Key de Firebase">
+                    <input type="text" id="api-key">
                 </div>
                 <div class="form-group">
                     <label>Project ID:</label>
-                    <input type="text" id="project-id" placeholder="Tu Project ID">
+                    <input type="text" id="project-id">
                 </div>
-                <button id="btn-guardar-config" class="btn-primary">Guardar Configuración</button>
-                <p><small>¿No tienes Firebase? <a href="#pasos-firebase">Sigue estos pasos</a></small></p>
+                <button id="btn-guardar-config" class="btn-primary" style="margin-top:10px;">Guardar</button>
             </div>
         </div>
     </div>
