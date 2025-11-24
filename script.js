@@ -1,4 +1,4 @@
-// Configuración de asignaturas (ESTRUCTURA MANTENIDA)
+// Configuración de asignaturas (IGUAL QUE ANTES)
 const config = {
     asignaturas: {
         "Mar": { 
@@ -33,55 +33,76 @@ const config = {
     limitePorcentaje: 20
 };
 
-// Variables globales
+// Variables
 let db = null;
 let faltas = [];
-let evaluacionActual = 1;
+let evaluacionActual = 1; // Puede ser 1, 2, 3 o 'total'
 
-// Elementos DOM
+// DOM
 const evalInput = document.getElementById('evaluacion-input');
 const fechaInput = document.getElementById('fecha');
-fechaInput.valueAsDate = new Date(); // Fecha actual por defecto
+fechaInput.valueAsDate = new Date();
 
-// --- FUNCIONALIDAD DE EVALUACIONES ---
+// --- LÓGICA DE VISTAS ---
 
-// Cambiar evaluación desde las pestañas
-window.cambiarEvaluacion = function(num) {
-    evaluacionActual = num;
+window.cambiarEvaluacion = function(val) {
+    evaluacionActual = val;
     
-    // Actualizar estilo pestañas
+    // 1. Estilo botones
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`tab-${num}`).classList.add('active');
+    document.getElementById(`tab-${val}`).classList.add('active');
     
-    // Sincronizar selector del formulario
-    evalInput.value = num;
+    // 2. Sincronizar formulario (Solo si no es 'total')
+    // Si elegimos Global, no cambiamos el selector de registro (se queda en la última usada)
+    if(val !== 'total') {
+        evalInput.value = val;
+    }
+
+    // 3. Actualizar textos dinámicos
+    const labelTexto = val === 'total' ? 'Global' : `Eval ${val}`;
+    document.getElementById('stats-label').textContent = labelTexto;
+    document.getElementById('stats-label-faltas').textContent = labelTexto;
+    document.getElementById('history-label').textContent = labelTexto;
 
     actualizarUI();
 }
 
-// Cambiar evaluación desde el selector del formulario
+// Selector manual
 evalInput.addEventListener('change', (e) => {
+    // Si el usuario cambia el selector para registrar, le llevamos a esa vista
     cambiarEvaluacion(parseInt(e.target.value));
 });
 
-// --- LÓGICA PRINCIPAL ---
+
+// --- CÁLCULOS CENTRALES ---
 
 function calcularStats(asignaturaKey) {
-    // 1. Total horas de la evaluación actual
-    const totalHorasAsignatura = config.asignaturas[asignaturaKey].evaluaciones[evaluacionActual];
-    
-    // 2. Faltas filtradas por asignatura Y evaluación actual
-    const faltasFiltradas = faltas.filter(f => 
-        f.asignatura === asignaturaKey && 
-        parseInt(f.evaluacion || 1) === evaluacionActual
-    );
+    let totalHorasAsignatura = 0;
+    let faltasFiltradas = [];
+
+    if (evaluacionActual === 'total') {
+        // MODO GLOBAL: Sumamos las 3 evaluaciones
+        const evals = config.asignaturas[asignaturaKey].evaluaciones;
+        totalHorasAsignatura = evals[1] + evals[2] + evals[3];
+        
+        // Tomamos TODAS las faltas de esta asignatura
+        faltasFiltradas = faltas.filter(f => f.asignatura === asignaturaKey);
+
+    } else {
+        // MODO EVALUACIÓN ESPECÍFICA
+        totalHorasAsignatura = config.asignaturas[asignaturaKey].evaluaciones[evaluacionActual];
+        
+        // Filtramos por asignatura Y evaluación
+        faltasFiltradas = faltas.filter(f => 
+            f.asignatura === asignaturaKey && 
+            parseInt(f.evaluacion || 1) === evaluacionActual
+        );
+    }
 
     const horasFaltadas = faltasFiltradas.reduce((sum, f) => sum + f.horas, 0);
     const porcentaje = (horasFaltadas / totalHorasAsignatura) * 100;
     
-    // CORRECCIÓN SOLICITADA:
-    // Calculamos el 20% y redondeamos SIEMPRE hacia abajo (Math.floor)
-    // Ejemplo: 46 * 0.20 = 9.2 -> Se convierte en 9.
+    // Límite 20% redondeado hacia abajo (Math.floor)
     const limiteHorasPermitidas = Math.floor(totalHorasAsignatura * (config.limitePorcentaje / 100));
 
     let estado = 'bueno';
@@ -91,7 +112,7 @@ function calcularStats(asignaturaKey) {
     return {
         horas: horasFaltadas,
         total: totalHorasAsignatura,
-        limitePermitido: limiteHorasPermitidas, // Ahora es un número entero seguro
+        limitePermitido: limiteHorasPermitidas,
         porcentaje: porcentaje,
         estado: estado
     };
@@ -100,15 +121,18 @@ function calcularStats(asignaturaKey) {
 function actualizarTablaResumen() {
     const tabla = document.getElementById('tabla-resumen');
     
+    // Cabecera dinámica
+    const sufijo = evaluacionActual === 'total' ? 'Global' : `Eval ${evaluacionActual}`;
+
     let html = `
         <table>
             <thead>
                 <tr>
                     <th>Asignatura</th>
-                    <th>Horas Eval ${evaluacionActual}</th>
-                    <th>% Eval ${evaluacionActual}</th>
+                    <th>Horas ${sufijo}</th>
+                    <th>% ${sufijo}</th>
                     <th>Estado</th>
-                    <th>Límite Faltas (20%)</th>
+                    <th>Máx. Faltas (20%)</th>
                 </tr>
             </thead>
             <tbody>
@@ -120,11 +144,8 @@ function actualizarTablaResumen() {
 
         const rowClass = stats.estado === 'danger' ? 'tr-danger' : (stats.estado === 'warning' ? 'tr-warning' : '');
         const badgeClass = stats.estado === 'danger' ? 'porcentaje-peligro' : (stats.estado === 'warning' ? 'porcentaje-advertencia' : 'porcentaje-bueno');
-        
         const estadoTexto = stats.estado === 'danger' ? 'Peligro' : (stats.estado === 'warning' ? 'Riesgo' : 'Correcto');
 
-        // CORRECCIÓN VISUAL:
-        // Quitamos <strong> y quitamos .toFixed() porque Math.floor ya devuelve entero
         html += `
             <tr class="${rowClass}">
                 <td><strong>${asig.nombreCompleto}</strong></td>
@@ -143,20 +164,27 @@ function actualizarTablaResumen() {
 function actualizarListaFaltas() {
     const container = document.getElementById('lista-faltas-container');
     
-    const faltasDeEstaEval = faltas.filter(f => parseInt(f.evaluacion || 1) === evaluacionActual);
+    let faltasAVisualizar = [];
+
+    if (evaluacionActual === 'total') {
+        faltasAVisualizar = [...faltas]; // Todas
+    } else {
+        faltasAVisualizar = faltas.filter(f => parseInt(f.evaluacion || 1) === evaluacionActual);
+    }
     
-    if (faltasDeEstaEval.length === 0) {
-        container.innerHTML = `<p style="text-align:center; color:#94a3b8; padding:20px;">No hay faltas en la ${evaluacionActual}ª Evaluación.</p>`;
+    if (faltasAVisualizar.length === 0) {
+        container.innerHTML = `<p style="text-align:center; color:#94a3b8; padding:20px;">No hay faltas registradas.</p>`;
         return;
     }
 
-    // Ordenar por fecha descendente
-    faltasDeEstaEval.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    // Ordenar por fecha
+    faltasAVisualizar.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
 
-    container.innerHTML = faltasDeEstaEval.map(f => `
+    container.innerHTML = faltasAVisualizar.map(f => `
         <div class="lista-falta-item">
             <div class="lista-falta-info">
                 <strong>${config.asignaturas[f.asignatura].nombreCompleto}</strong>
+                <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:8px;">Eval ${f.evaluacion || 1}</span>
                 <br>
                 <small>${new Date(f.fecha).toLocaleDateString()} | ${f.horas} horas</small>
             </div>
@@ -188,18 +216,18 @@ function actualizarUI() {
     actualizarTablaResumen();
     actualizarListaFaltas();
     actualizarEstadisticas();
-    // Reaplicar filtro activo si existe
+    
     const filtroActivo = document.querySelector('.btn-filter.active');
     if(filtroActivo) filtrarTabla(filtroActivo.dataset.filter);
 }
 
-// --- FUNCIONES FIREBASE Y AUXILIARES ---
+// --- FIREBASE Y UTILIDADES (Igual que antes) ---
 
 async function registrarFalta() {
     const asignatura = document.getElementById('asignatura').value;
     const fecha = document.getElementById('fecha').value;
     const horas = parseInt(document.getElementById('horas').value);
-    const evaluacion = parseInt(evalInput.value);
+    const evaluacion = parseInt(evalInput.value); // Siempre toma el valor del selector
 
     if(!asignatura || !fecha) return alert('Rellena todos los campos');
 
@@ -208,16 +236,18 @@ async function registrarFalta() {
             asignatura, fecha, horas, evaluacion,
             timestamp: new Date().toISOString()
         });
-        mostrarNotificacion('Falta guardada', 'success');
-        // Solo reseteamos asignatura, mantenemos fecha
+        mostrarNotificacion(`Falta guardada (Eval ${evaluacion})`, 'success');
         document.getElementById('asignatura').value = '';
+        
+        // Si estamos en vista Global, actualizamos para ver la nueva falta.
+        // Si estábamos en otra vista distinta a la del registro, podríamos cambiar, 
+        // pero mejor dejar al usuario donde está.
     } catch(e) {
         console.error(e);
         mostrarNotificacion('Error al guardar', 'error');
     }
 }
 
-// Configuración Firebase (Recuperamos localStorage)
 let firebaseConfig = {
     apiKey: localStorage.getItem('firebase_apiKey'),
     projectId: localStorage.getItem('firebase_projectId')
@@ -225,17 +255,12 @@ let firebaseConfig = {
 
 function inicializarFirebase() {
     if(!firebaseConfig.apiKey) {
-        // Si no hay config, mostrar modal
         const modal = document.getElementById('firebase-modal');
         if(modal) modal.style.display = 'block';
         return;
     }
-    
-    // Inicializar app
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
-    
-    // Listener en tiempo real
     db.collection('faltas').onSnapshot(snap => {
         faltas = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
         updateStatus('Conectado', 'connected');
@@ -243,7 +268,6 @@ function inicializarFirebase() {
     }, err => updateStatus('Error', 'error'));
 }
 
-// Helpers visuales
 function updateStatus(msg, type) {
     const el = document.getElementById('status-indicator');
     const txt = document.getElementById('status-text');
@@ -265,7 +289,6 @@ async function eliminarFalta(id) {
     if(confirm('¿Borrar falta?')) await db.collection('faltas').doc(id).delete();
 }
 
-// Filtros de tabla
 function filtrarTabla(filtro) {
     const filas = document.querySelectorAll('#tabla-resumen tbody tr');
     filas.forEach(fila => {
@@ -275,7 +298,6 @@ function filtrarTabla(filtro) {
     });
 }
 
-// Listeners
 const btnRegistrar = document.getElementById('btn-registrar');
 if(btnRegistrar) btnRegistrar.addEventListener('click', registrarFalta);
 
@@ -300,7 +322,6 @@ if(btnGuardar) {
     });
 }
 
-// Botones extra (limpiar/exportar) si existen en el HTML
 const btnLimpiar = document.getElementById('btn-limpiar');
 if(btnLimpiar) btnLimpiar.addEventListener('click', async () => {
     if(confirm('¿ELIMINAR TODO? Se borrarán todas las evaluaciones.')) {
@@ -321,5 +342,4 @@ if(btnExportar) btnExportar.addEventListener('click', () => {
     a.click();
 });
 
-// Arrancar
 document.addEventListener('DOMContentLoaded', inicializarFirebase);
