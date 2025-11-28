@@ -3,31 +3,31 @@ const config = {
     asignaturas: {
         "Mar": { 
             nombreCompleto: "Markatze Lengoaiak (Mar)",
-            evaluaciones: { 1: 46, 2: 42, 3: 38 }
+            evaluaciones: { 1: 46, 2: 38, 3: 38 }
         },
         "Gar": { 
             nombreCompleto: "Garapena (Gar)",
-            evaluaciones: { 1: 34, 2: 32, 3: 28 }
+            evaluaciones: { 1: 34, 2: 29, 3: 28 }
         },
         "BBDD": { 
             nombreCompleto: "Datu-baseak (BBDD)",
-            evaluaciones: { 1: 66, 2: 62, 3: 60 }
+            evaluaciones: { 1: 66, 2: 56, 3: 60 }
         },
         "Prog": { 
             nombreCompleto: "Programazioa (Prog)",
-            evaluaciones: { 1: 90, 2: 86, 3: 76 }
+            evaluaciones: { 1: 90, 2: 78, 3: 76 }
         },
         "Ingles": { 
             nombreCompleto: "Ingeles Teknikoa (Ingles)",
-            evaluaciones: { 1: 24, 2: 24, 3: 18 }
+            evaluaciones: { 1: 24, 2: 22, 3: 18 }
         },
         "Digi": { 
             nombreCompleto: "Digitalizazioa (Digi)",
-            evaluaciones: { 1: 24, 2: 24, 3: 16 }
+            evaluaciones: { 1: 24, 2: 22, 3: 16 }
         },
         "Irau": { 
             nombreCompleto: "Iraunkortasuna (Irau)",
-            evaluaciones: { 1: 12, 2: 12, 3: 8 }
+            evaluaciones: { 1: 12, 2: 11, 3: 8 }
         }
     },
     limitePorcentaje: 20
