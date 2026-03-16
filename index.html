@@ -3,71 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Asistencia - CIFP USURBIL</title>
+    <title>Control de Asistencia — CIFP USURBIL</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <style>
-        .eval-tabs {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap; /* Para móviles */
-        }
-        .tab-btn {
-            padding: 8px 20px;
-            border: 2px solid #e2e8f0;
-            background: white;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: 600;
-            color: #64748b;
-            transition: all 0.3s ease;
-        }
-        .tab-btn.active {
-            background: #2563eb;
-            color: white;
-            border-color: #2563eb;
-            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-        }
-        /* Estilo especial para el botón Global */
-        .tab-btn-global.active {
-            background: #7c3aed; /* Un color morado para diferenciarlo, o usa azul si prefieres */
-            border-color: #7c3aed;
-        }
-    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="login-screen">
+    <div class="login-card">
+        <div class="login-logo">CA</div>
+        <h1 class="login-title">Control de Asistencia</h1>
+        <p class="login-subtitle">CIFP USURBIL · Acceso privado</p>
+        <div class="login-form">
+            <div class="field">
+                <label for="login-user">Usuario</label>
+                <input type="text" id="login-user" placeholder="admin" autocomplete="username">
+            </div>
+            <div class="field">
+                <label for="login-pass">Contraseña</label>
+                <input type="password" id="login-pass" placeholder="••••••" autocomplete="current-password">
+            </div>
+            <div id="login-error" class="login-error" style="display:none">Usuario o contraseña incorrectos</div>
+            <button id="btn-login" class="btn-primary btn-full">Entrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app" style="display:none">
+    <div class="bg-grid"></div>
     <div class="container">
-        <header>
-            <h1>📊 Control de Asistencia</h1>
-            <p>CIFP USURBIL - 1DDAW3 Web Aplikazioen Garapena</p>
-            <div class="db-status" id="db-status">
-                <span class="status-indicator" id="status-indicator">●</span>
-                <span id="status-text">Conectando...</span>
+
+        <!-- HEADER -->
+        <header class="site-header">
+            <div class="header-left">
+                <div class="logo-mark">CA</div>
+                <div>
+                    <h1>Control de Asistencia</h1>
+                    <p>CIFP USURBIL · 1DDAW3 Web Aplikazioen Garapena</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="db-badge">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Conectando…</span>
+                </div>
+                <button class="btn-icon" id="btn-settings" title="Configuración Firebase">⚙</button>
+                <button class="btn-ghost btn-sm" id="btn-logout">↩ Salir</button>
             </div>
         </header>
 
-        <section class="registro-faltas">
-            <h2>Registrar Falta</h2>
-            <div class="form-container">
-                <div class="form-group">
-                    <label for="evaluacion-input">Evaluación:</label>
-                    <select id="evaluacion-input" required>
+        <!-- TOP STRIP: EVAL TABS + STATS + REGISTER -->
+        <div class="top-strip">
+            <nav class="eval-nav">
+                <button class="eval-tab active" data-eval="1">1ª Eval</button>
+                <button class="eval-tab" data-eval="2">2ª Eval</button>
+                <button class="eval-tab" data-eval="3">3ª Eval</button>
+                <button class="eval-tab eval-tab--global" data-eval="total">🌍 Global</button>
+            </nav>
+            <div class="top-right">
+                <div class="stats-strip">
+                    <div class="stat-pill">
+                        <span class="stat-pill__label">Horas totales</span>
+                        <span class="stat-pill__val" id="total-horas">—</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="stat-pill__label">Faltadas</span>
+                        <span class="stat-pill__val" id="total-faltas">—</span>
+                    </div>
+                    <div class="stat-pill stat-pill--alert" id="riesgo-pill">
+                        <span class="stat-pill__label">En riesgo</span>
+                        <span class="stat-pill__val" id="asignaturas-riesgo">—</span>
+                    </div>
+                </div>
+                <button id="btn-abrir-registro" class="btn-primary">+ Registrar falta</button>
+            </div>
+        </div>
+
+        <!-- CONTENT TABS NAV -->
+        <div class="content-nav">
+            <button class="content-tab active" data-tab="resumen">📋 Resumen</button>
+            <button class="content-tab" data-tab="grafico">📈 Gráfico</button>
+            <button class="content-tab" data-tab="calendario">📅 Calendario</button>
+            <button class="content-tab" data-tab="calculadora">🔮 Calculadora</button>
+        </div>
+
+        <!-- TAB: RESUMEN -->
+        <div id="tab-resumen" class="tab-panel panel active">
+            <div class="panel-inner">
+                <div class="resumen-header">
+                    <h2 class="panel__title">Resumen de asistencia</h2>
+                    <div class="filter-group">
+                        <button class="btn-filter active" data-filter="all">Todas</button>
+                        <button class="btn-filter" data-filter="warning">⚠ Riesgo</button>
+                        <button class="btn-filter" data-filter="danger">🔴 Peligro</button>
+                    </div>
+                </div>
+                <div id="tabla-resumen" class="tabla-container"></div>
+
+                <!-- Historial -->
+                <div class="historial-section">
+                    <div class="historial-header">
+                        <h3>Historial <span class="historial-badge" id="historial-eval-label">Eval 1</span></h3>
+                        <div class="historial-actions">
+                            <button class="btn-ghost btn-sm" id="btn-exportar">↓ JSON</button>
+                            <button class="btn-ghost btn-sm" id="btn-importar">↑ JSON</button>
+                            <input type="file" id="file-importar" accept=".json" style="display:none">
+                            <button class="btn-danger-ghost btn-sm" id="btn-limpiar">🗑 Limpiar BD</button>
+                        </div>
+                    </div>
+                    <div id="lista-faltas-container" class="historial-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: GRÁFICO -->
+        <div id="tab-grafico" class="tab-panel panel">
+            <div class="panel-inner">
+                <h2 class="panel__title">Porcentaje de faltas por asignatura</h2>
+                <p class="panel__subtitle">Las líneas indican los umbrales de riesgo (10%) y peligro (20%)</p>
+                <div class="chart-container">
+                    <canvas id="chart-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: CALENDARIO -->
+        <div id="tab-calendario" class="tab-panel panel">
+            <div class="panel-inner">
+                <div class="cal-header">
+                    <button class="btn-ghost btn-sm" id="cal-prev">← Anterior</button>
+                    <h2 class="panel__title" id="cal-title">Enero 2026</h2>
+                    <button class="btn-ghost btn-sm" id="cal-next">Siguiente →</button>
+                </div>
+                <div class="cal-legend" id="cal-legend"></div>
+                <div id="cal-grid" class="cal-grid"></div>
+                <div id="cal-detail" class="cal-detail" style="display:none"></div>
+            </div>
+        </div>
+
+        <!-- TAB: CALCULADORA -->
+        <div id="tab-calculadora" class="tab-panel panel">
+            <div class="panel-inner">
+                <h2 class="panel__title">Calculadora predictiva</h2>
+                <p class="panel__subtitle">Simula qué estado tendría una asignatura si faltas más horas</p>
+                <div class="calc-form">
+                    <div class="field">
+                        <label for="calc-asignatura">Asignatura</label>
+                        <select id="calc-asignatura">
+                            <option value="">— Seleccionar —</option>
+                            <option value="Mar">Markatze Lengoaiak (Mar)</option>
+                            <option value="Gar">Garapena (Gar)</option>
+                            <option value="BBDD">Datu-baseak (BBDD)</option>
+                            <option value="Prog">Programazioa (Prog)</option>
+                            <option value="Ingles">Ingeles Teknikoa (Ingles)</option>
+                            <option value="Digi">Digitalizazioa (Digi)</option>
+                            <option value="Irau">Iraunkortasuna (Irau)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="calc-horas">Horas a simular</label>
+                        <input type="number" id="calc-horas" min="1" max="30" value="2">
+                    </div>
+                    <button id="btn-simular" class="btn-primary">Simular</button>
+                </div>
+                <div id="calc-result" class="calc-result" style="display:none"></div>
+            </div>
+        </div>
+
+    </div><!-- /container -->
+</div><!-- /app -->
+
+<!-- MODAL: Registrar falta -->
+<div id="register-modal" class="modal">
+    <div class="modal-backdrop" id="register-backdrop"></div>
+    <div class="modal-card">
+        <div class="modal-card__header">
+            <h3>📝 Registrar falta</h3>
+            <button class="modal-close" id="register-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <div class="form-grid">
+                <div class="field">
+                    <label for="evaluacion-input">Evaluación</label>
+                    <select id="evaluacion-input">
                         <option value="1">1ª Evaluación</option>
                         <option value="2">2ª Evaluación</option>
                         <option value="3">3ª Evaluación</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="fecha">Fecha:</label>
+                <div class="field">
+                    <label for="fecha">Fecha</label>
                     <input type="date" id="fecha" required>
                 </div>
-                <div class="form-group">
-                    <label for="asignatura">Asignatura:</label>
+                <div class="field">
+                    <label for="asignatura">Asignatura</label>
                     <select id="asignatura" required>
-                        <option value="">Seleccionar asignatura</option>
+                        <option value="">— Seleccionar —</option>
                         <option value="Mar">Markatze Lengoaiak (Mar)</option>
                         <option value="Gar">Garapena (Gar)</option>
                         <option value="BBDD">Datu-baseak (BBDD)</option>
@@ -77,74 +212,139 @@
                         <option value="Irau">Iraunkortasuna (Irau)</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="horas">Horas:</label>
+                <div class="field">
+                    <label for="horas">Horas</label>
                     <input type="number" id="horas" min="1" max="8" value="2" required>
                 </div>
-                <button id="btn-registrar" class="btn-primary">Registrar</button>
-            </div>
-        </section>
-
-        <section class="resumen-asistencia">
-            <h2>Resumen de Asistencia</h2>
-            
-            <div class="eval-tabs">
-                <button class="tab-btn active" onclick="cambiarEvaluacion(1)" id="tab-1">1ª Eval</button>
-                <button class="tab-btn" onclick="cambiarEvaluacion(2)" id="tab-2">2ª Eval</button>
-                <button class="tab-btn" onclick="cambiarEvaluacion(3)" id="tab-3">3ª Eval</button>
-                <button class="tab-btn tab-btn-global" onclick="cambiarEvaluacion('total')" id="tab-total">🌍 Global</button>
-            </div>
-
-            <div class="filtros">
-                <button class="btn-filter active" data-filter="all">Todas</button>
-                <button class="btn-filter" data-filter="warning">Riesgo</button>
-                <button class="btn-filter" data-filter="danger">Peligro</button>
-            </div>
-
-            <div id="tabla-resumen" class="tabla-container"></div>
-        </section>
-
-        <section class="estadisticas">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Total Horas (<span id="stats-label">Eval Actual</span>)</h3>
-                    <p id="total-horas">0</p>
+                <div class="field">
+                    <label for="tipo">Tipo</label>
+                    <select id="tipo">
+                        <option value="injustificada">Injustificada</option>
+                        <option value="justificada">Justificada</option>
+                    </select>
                 </div>
-                <div class="stat-card">
-                    <h3>Faltas (<span id="stats-label-faltas">Eval Actual</span>)</h3>
-                    <p id="total-faltas">0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>En Riesgo</h3>
-                    <p id="asignaturas-riesgo">0</p>
+                <div class="field field--full">
+                    <label for="nota">Nota (opcional)</label>
+                    <input type="text" id="nota" placeholder="Ej: médico, excursión, examen…" maxlength="100">
                 </div>
             </div>
-        </section>
+            <button id="btn-registrar" class="btn-primary btn-full" style="margin-top:8px;">Registrar falta</button>
+        </div>
+    </div>
+</div>
 
-        <section class="lista-faltas">
-            <h2>Historial (<span id="history-label">Evaluación Actual</span>)</h2>
-            <div class="acciones-lista">
-                <button id="btn-exportar" class="btn-secondary">Exportar JSON</button>
-                <button id="btn-limpiar" class="btn-secondary">Limpiar BD</button>
+<!-- MODAL: Editar falta -->
+<div id="edit-modal" class="modal">
+    <div class="modal-backdrop" id="edit-backdrop"></div>
+    <div class="modal-card">
+        <div class="modal-card__header">
+            <h3>✏️ Editar falta</h3>
+            <button class="modal-close" id="edit-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <input type="hidden" id="edit-id">
+            <div class="form-grid">
+                <div class="field">
+                    <label for="edit-evaluacion">Evaluación</label>
+                    <select id="edit-evaluacion">
+                        <option value="1">1ª Evaluación</option>
+                        <option value="2">2ª Evaluación</option>
+                        <option value="3">3ª Evaluación</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="edit-fecha">Fecha</label>
+                    <input type="date" id="edit-fecha">
+                </div>
+                <div class="field">
+                    <label for="edit-asignatura">Asignatura</label>
+                    <select id="edit-asignatura">
+                        <option value="Mar">Markatze Lengoaiak (Mar)</option>
+                        <option value="Gar">Garapena (Gar)</option>
+                        <option value="BBDD">Datu-baseak (BBDD)</option>
+                        <option value="Prog">Programazioa (Prog)</option>
+                        <option value="Ingles">Ingeles Teknikoa (Ingles)</option>
+                        <option value="Digi">Digitalizazioa (Digi)</option>
+                        <option value="Irau">Iraunkortasuna (Irau)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="edit-horas">Horas</label>
+                    <input type="number" id="edit-horas" min="1" max="8">
+                </div>
+                <div class="field">
+                    <label for="edit-tipo">Tipo</label>
+                    <select id="edit-tipo">
+                        <option value="injustificada">Injustificada</option>
+                        <option value="justificada">Justificada</option>
+                    </select>
+                </div>
+                <div class="field field--full">
+                    <label for="edit-nota">Nota (opcional)</label>
+                    <input type="text" id="edit-nota" maxlength="100">
+                </div>
             </div>
-            <div id="lista-faltas-container"></div>
-        </section>
-
-        <div id="firebase-modal" class="modal">
-            <div class="modal-content">
-                <h3>🔧 Configuración Firebase</h3>
-                <div class="form-group">
-                    <label>API Key:</label>
-                    <input type="text" id="api-key">
-                </div>
-                <div class="form-group">
-                    <label>Project ID:</label>
-                    <input type="text" id="project-id">
-                </div>
-                <button id="btn-guardar-config" class="btn-primary" style="margin-top:10px;">Guardar</button>
+            <div class="confirm-buttons" style="margin-top:8px;">
+                <button id="edit-cancel" class="btn-ghost">Cancelar</button>
+                <button id="edit-save" class="btn-primary">Guardar cambios</button>
             </div>
         </div>
     </div>
-    <script src="script.js"></script>
+</div>
+
+<!-- MODAL: Firebase config -->
+<div id="firebase-modal" class="modal">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-card">
+        <div class="modal-card__header">
+            <h3>🔧 Configuración Firebase</h3>
+            <button class="modal-close" id="modal-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <p class="modal-hint">Necesitas un proyecto de Firebase con Firestore habilitado.</p>
+            <div class="field">
+                <label for="api-key">API Key</label>
+                <input type="text" id="api-key" placeholder="AIzaSy…" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="project-id">Project ID</label>
+                <input type="text" id="project-id" placeholder="mi-proyecto-xxxxx" autocomplete="off">
+            </div>
+            <button id="btn-guardar-config" class="btn-primary btn-full" style="margin-top:4px;">Guardar y reconectar</button>
+            <details class="config-help">
+                <summary>¿Cómo obtengo estos datos?</summary>
+                <ol>
+                    <li>Ve a <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+                    <li>Crea o abre tu proyecto</li>
+                    <li>⚙ Configuración → Tu aplicación web</li>
+                    <li>Copia <code>apiKey</code> y <code>projectId</code></li>
+                    <li>Activa <strong>Firestore Database</strong> en modo prueba</li>
+                </ol>
+            </details>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Confirmación -->
+<div id="confirm-modal" class="modal">
+    <div class="modal-backdrop" id="confirm-backdrop"></div>
+    <div class="modal-card modal-card--sm">
+        <div class="modal-card__header">
+            <h3 id="confirm-title">¿Confirmar?</h3>
+        </div>
+        <div class="modal-card__body">
+            <p id="confirm-message" style="color:var(--txt-secondary);font-size:0.9rem;"></p>
+            <div class="confirm-buttons">
+                <button id="confirm-cancel" class="btn-ghost">Cancelar</button>
+                <button id="confirm-ok" class="btn-danger">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toasts -->
+<div id="toast-container" aria-live="polite"></div>
+
+<script src="script.js"></script>
 </body>
 </html>
