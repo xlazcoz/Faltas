@@ -131,6 +131,352 @@ function asignaturasDelDia(date) {
     const dow = date.getDay();
     return Object.keys(CONFIG.horasDiarias[dow] || {});
 }
+
+/* ============================================================
+   OFFLINE CACHE
+   ============================================================ */
+const Offline = {
+    KEY: 'ca_faltas_cache',
+    save(faltas) {
+        try { localStorage.setItem(this.KEY, JSON.stringify(faltas)); } catch(e) {}
+    },
+    load() {
+        try { const d = localStorage.getItem(this.KEY); return d ? JSON.parse(d) : []; }
+        catch(e) { return []; }
+    }
+};
+
+/* ============================================================
+   PAPELERA
+   ============================================================ */
+const Trash = {
+    KEY: 'ca_papelera',
+    DAYS: 7,
+
+    getAll() {
+        try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); }
+        catch(e) { return []; }
+    },
+
+    add(falta) {
+        const items = this.getAll();
+        // Evitar duplicados
+        if (items.find(f => f.id === falta.id)) return;
+        items.push({ ...falta, deletedAt: new Date().toISOString() });
+        localStorage.setItem(this.KEY, JSON.stringify(items));
+        this.updateBadge();
+    },
+
+    remove(id) {
+        const items = this.getAll().filter(f => f.id !== id);
+        localStorage.setItem(this.KEY, JSON.stringify(items));
+        this.updateBadge();
+    },
+
+    clear() {
+        localStorage.removeItem(this.KEY);
+        this.updateBadge();
+    },
+
+    cleanOld() {
+        const cutoff = Date.now() - this.DAYS * 24 * 60 * 60 * 1000;
+        const items = this.getAll().filter(f => new Date(f.deletedAt).getTime() > cutoff);
+        localStorage.setItem(this.KEY, JSON.stringify(items));
+        this.updateBadge();
+    },
+
+    count() { return this.getAll().length; },
+
+    updateBadge() {
+        const badge = document.getElementById('trash-count');
+        if (!badge) return;
+        const n = this.count();
+        badge.style.display = n > 0 ? 'flex' : 'none';
+        badge.textContent = n;
+    },
+
+    render() {
+        const container = document.getElementById('trash-list');
+        if (!container) return;
+        const items = this.getAll().sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
+
+        if (items.length === 0) {
+            container.innerHTML = '<div class="empty-state">La papelera está vacía</div>';
+            return;
+        }
+
+        container.innerHTML = items.map(f => {
+            const asig  = CONFIG.asignaturas[f.asignatura];
+            const nombre = asig ? asig.nombre : f.asignatura;
+            const color  = CONFIG.colors[f.asignatura] || '#64748b';
+            const fecha  = f.fecha ? new Date(f.fecha + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '—';
+            const delDate = new Date(f.deletedAt);
+            const daysLeft = Math.max(0, Math.ceil((delDate.getTime() + Trash.DAYS * 86400000 - Date.now()) / 86400000));
+            const delStr = delDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+
+            return `
+            <div class="falta-item" style="opacity:0.75">
+                <div class="falta-item__dot" style="background:${color};box-shadow:0 0 5px ${color}"></div>
+                <div class="falta-item__info">
+                    <div class="falta-item__asig">${nombre}</div>
+                    <div class="falta-item__meta">
+                        <span>${fecha}</span>·<span>${f.horas}h</span>
+                        <span class="falta-item__eval-badge">E${f.evaluacion || '?'}</span>
+                        <span style="color:var(--amber);font-size:0.68rem">Eliminado ${delStr} · expira en ${daysLeft}d</span>
+                    </div>
+                    ${f.nota ? `<div class="falta-item__nota">${f.nota}</div>` : ''}
+                </div>
+                <div class="falta-item__btns">
+                    <button class="btn-ghost btn-sm" onclick="Actions.restaurarFalta('${f.id}')">↩ Restaurar</button>
+                    <button class="btn-micro btn-micro--danger" onclick="Actions.eliminarDefinitivo('${f.id}')" title="Eliminar definitivamente">✕</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+};
+
+/* ============================================================
+   DASHBOARD (post-login)
+   ============================================================ */
+const Dashboard = {
+    SHOWN_KEY: 'ca_dash_shown',
+
+    shouldShow() { return !sessionStorage.getItem(this.SHOWN_KEY); },
+    markShown()  { sessionStorage.setItem(this.SHOWN_KEY, '1'); },
+
+    show() {
+        if (!this.shouldShow()) return;
+        this.markShown();
+        const el = document.getElementById('dashboard-overlay');
+        if (!el) return;
+        this.build();
+        el.style.display = 'flex';
+        requestAnimationFrame(() => { el.style.opacity = '1'; });
+    },
+
+    hide() {
+        const el = document.getElementById('dashboard-overlay');
+        if (!el) return;
+        el.style.opacity = '0';
+        setTimeout(() => { el.style.display = 'none'; }, 350);
+    },
+
+    build() {
+        const content = document.getElementById('dashboard-content');
+        if (!content) return;
+
+        const now  = new Date();
+        const hour = now.getHours();
+        const greeting = hour < 12 ? '🌅 Buenos días' : hour < 20 ? '☀️ Buenas tardes' : '🌙 Buenas noches';
+        const dateStr = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+
+        // Today's classes
+        const y  = now.getFullYear();
+        const m  = String(now.getMonth() + 1).padStart(2, '0');
+        const d  = String(now.getDate()).padStart(2, '0');
+        const hoyStr = `${y}-${m}-${d}`;
+        const tdHoy  = tipoDia(hoyStr);
+        const hoyAsig = tdHoy ? [] : asignaturasDelDia(now);
+
+        // At-risk subjects
+        const enRiesgo = Object.keys(CONFIG.asignaturas).filter(k => State.calcStats(k).estado !== 'ok');
+
+        // This week's absences
+        const dow = now.getDay();
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+        weekStart.setHours(0, 0, 0, 0);
+        const thisWeekFaltas = State.faltas.filter(f => {
+            if (!f.fecha) return false;
+            const fd = new Date(f.fecha + 'T00:00:00');
+            return fd >= weekStart && fd <= now;
+        });
+        const horasEstaSemana = thisWeekFaltas.reduce((s, f) => s + (f.horas || 0), 0);
+
+        // Today's classes HTML
+        let clasesHTML;
+        if (tdHoy) {
+            const icons = { festivo: '🎉 Hoy es festivo', examen: '📝 Semana de exámenes', practica: '🏢 Prácticas de empresa' };
+            clasesHTML = `<div class="dash-no-class">${icons[tdHoy.tipo] || 'No hay clase hoy'}</div>`;
+        } else if (hoyAsig.length === 0) {
+            clasesHTML = '<div class="dash-no-class">No hay clase hoy</div>';
+        } else {
+            clasesHTML = hoyAsig.map(k => {
+                const color = CONFIG.colors[k] || '#64748b';
+                const horas = CONFIG.horasDiarias[now.getDay()]?.[k] || 0;
+                return `<div class="dash-class-pill" style="border-color:${color}30;background:${color}10">
+                    <span class="td-dot" style="background:${color};box-shadow:0 0 5px ${color};width:8px;height:8px;border-radius:50%;display:inline-block"></span>
+                    <span style="font-weight:600">${k}</span>
+                    <span style="color:var(--txt-muted);font-size:0.75rem;font-family:var(--font-mono)">${horas}h</span>
+                </div>`;
+            }).join('');
+        }
+
+        // At-risk HTML
+        const riesgoHTML = enRiesgo.length === 0
+            ? '<div class="dash-ok">✅ Todas las asignaturas en estado correcto</div>'
+            : enRiesgo.map(k => {
+                const s = State.calcStats(k);
+                const color = s.estado === 'danger' ? 'var(--red)' : 'var(--amber)';
+                const icon  = s.estado === 'danger' ? '⛔' : '⚠️';
+                return `<div class="dash-alert-item" style="border-color:${s.estado === 'danger' ? 'rgba(255,64,96,0.25)' : 'rgba(255,184,48,0.25)'}">
+                    <span>${icon}</span>
+                    <span style="font-weight:600;color:${color}">${CONFIG.asignaturas[k].nombre.replace(/\s*\(.*\)/, '')}</span>
+                    <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--txt-secondary);margin-left:auto">${s.pct.toFixed(1)}% — quedan ${s.horasRestantes}h</span>
+                </div>`;
+            }).join('');
+
+        content.innerHTML = `
+            <div class="dash-greeting">${greeting}</div>
+            <div class="dash-date">${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}</div>
+
+            <div class="dash-cols">
+                <div class="dash-section">
+                    <div class="dash-section-title">Hoy tienes clase de</div>
+                    <div class="dash-classes">${clasesHTML}</div>
+                </div>
+                <div class="dash-section">
+                    <div class="dash-section-title">Esta semana</div>
+                    <div class="dash-week-stat">
+                        <span class="dash-week-num" style="color:${horasEstaSemana > 0 ? 'var(--red)' : 'var(--lime)'}">${horasEstaSemana}h</span>
+                        <span class="dash-week-label">faltadas</span>
+                        <span class="dash-week-num">${thisWeekFaltas.length}</span>
+                        <span class="dash-week-label">registros</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dash-section">
+                <div class="dash-section-title">Estado de asignaturas</div>
+                <div class="dash-alerts">${riesgoHTML}</div>
+            </div>
+        `;
+    }
+};
+
+/* ============================================================
+   WEEK SUMMARY
+   ============================================================ */
+const WeekSummary = {
+    render() {
+        const container = document.getElementById('week-summary');
+        if (!container) return;
+
+        const now = new Date();
+        const dow = now.getDay();
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+        weekStart.setHours(0, 0, 0, 0);
+
+        const dayLabels = ['L', 'M', 'X', 'J', 'V'];
+        const dayDates  = Array.from({ length: 5 }, (_, i) => {
+            const d = new Date(weekStart);
+            d.setDate(weekStart.getDate() + i);
+            return d;
+        });
+
+        const horasSemanales = dayDates.reduce((total, d) => {
+            const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            if (tipoDia(ds)) return total;
+            return total + Object.values(CONFIG.horasDiarias[d.getDay()] || {}).reduce((s, h) => s + h, 0);
+        }, 0);
+
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 4);
+
+        const thisWeekFaltas = State.faltasVisibles.filter(f => {
+            if (!f.fecha) return false;
+            const fd = new Date(f.fecha + 'T00:00:00');
+            return fd >= weekStart && fd <= weekEnd;
+        });
+        const horasFaltadas = thisWeekFaltas.reduce((s, f) => s + (f.horas || 0), 0);
+
+        const pills = dayDates.map((d, i) => {
+            const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            const td = tipoDia(ds);
+            const isToday   = d.toDateString() === now.toDateString();
+            const isPast    = d < now && !isToday;
+            const faltasDay = thisWeekFaltas.filter(f => f.fecha === ds);
+            const hasFaltas = faltasDay.length > 0;
+            const horasDia  = faltasDay.reduce((s, f) => s + (f.horas || 0), 0);
+
+            let cls  = 'week-day';
+            let style = '';
+            let sub  = d.getDate();
+
+            if (isToday) cls += ' week-day--today';
+            if (td && td.tipo !== 'finde') { cls += ' week-day--special'; style = 'opacity:0.35'; }
+            else if (hasFaltas) { cls += ' week-day--faltas'; }
+            else if (isPast && !td) { cls += ' week-day--ok'; }
+
+            return `<div class="${cls}" style="${style}" title="${d.toLocaleDateString('es-ES')}${hasFaltas ? ` — ${horasDia}h faltadas` : ''}">
+                <span class="week-day__label">${dayLabels[i]}</span>
+                <span class="week-day__num">${sub}</span>
+                ${hasFaltas ? `<span class="week-day__hours">${horasDia}h</span>` : ''}
+            </div>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="week-summary-inner">
+                <div class="week-label">Esta semana</div>
+                <div class="week-days">${pills}</div>
+                <div class="week-stats">
+                    <span class="week-stat">
+                        <span class="week-stat__val" style="color:${horasFaltadas > 0 ? 'var(--red)' : 'var(--lime)'}">${horasFaltadas}h</span>
+                        <span class="week-stat__label">faltadas</span>
+                    </span>
+                    <span class="week-stat">
+                        <span class="week-stat__val">${horasSemanales}h</span>
+                        <span class="week-stat__label">lectivas</span>
+                    </span>
+                </div>
+            </div>`;
+    }
+};
+
+/* ============================================================
+   COMPACT VIEW
+   ============================================================ */
+const CompactView = {
+    active: false,
+    toggle() {
+        this.active = !this.active;
+        document.getElementById('tabla-resumen')?.classList.toggle('tabla-compacta', this.active);
+        const btn = document.getElementById('btn-compact');
+        if (btn) btn.textContent = this.active ? '⊞ Expandir' : '⊟ Compactar';
+        Toast.show(this.active ? 'Vista compacta activada' : 'Vista expandida', 'info', 1500);
+    }
+};
+
+/* ============================================================
+   SHORTCUTS
+   ============================================================ */
+const Shortcuts = {
+    init() {
+        document.addEventListener('keydown', e => {
+            if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            switch (e.key) {
+                case 'n': case 'N': e.preventDefault(); Modals.registro.open(); break;
+                case '1': Actions.cambiarEvaluacion(1); break;
+                case '2': Actions.cambiarEvaluacion(2); break;
+                case '3': Actions.cambiarEvaluacion(3); break;
+                case 'g': case 'G': if (!e.shiftKey) Actions.cambiarEvaluacion('total'); break;
+                case 'r': case 'R': UI.switchTab('resumen'); break;
+                case 'p': case 'P': UI.switchTab('grafico'); break;
+                case 'c': case 'C':
+                    if (e.shiftKey) CompactView.toggle();
+                    else UI.switchTab('calendario');
+                    break;
+                case 'k': case 'K': UI.switchTab('calculadora'); break;
+                case 't': case 'T': Modals.trash.open(); break;
+                case '?': document.getElementById('shortcuts-modal')?.classList.add('open'); break;
+            }
+        });
+    }
+};
+
 const Auth = {
     KEY: 'ca_auth_v1',
     isLoggedIn() { return sessionStorage.getItem(this.KEY) === 'ok'; },
@@ -157,7 +503,19 @@ const DB = {
     },
     init() {
         const { apiKey, projectId } = this.credentials;
-        if (!apiKey || !projectId) { UI.setStatus('Sin configurar', 'error'); Modals.firebase.open(); return; }
+        if (!apiKey || !projectId) {
+            const cached = Offline.load();
+            if (cached.length > 0) {
+                State.faltas = cached;
+                UI.setStatus('Offline (sin config)', 'connecting');
+                Toast.show('Firebase sin configurar — mostrando caché local', 'info');
+                UI.render();
+            } else {
+                UI.setStatus('Sin configurar', 'error');
+                Modals.firebase.open();
+            }
+            return;
+        }
         try {
             if (!firebase.apps.length) {
                 firebase.initializeApp({ apiKey, projectId, authDomain: `${projectId}.firebaseapp.com` });
@@ -171,10 +529,25 @@ const DB = {
         this.instance.collection('faltas').onSnapshot(
             snap => {
                 State.faltas = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                Offline.save(State.faltas);
                 UI.setStatus('Conectado', 'connected');
                 UI.render();
+                Dashboard.show();
             },
-            err => { console.error(err); UI.setStatus('Error', 'error'); Toast.show('Error al leer Firestore', 'error'); }
+            err => {
+                console.error(err);
+                const cached = Offline.load();
+                if (cached.length > 0) {
+                    State.faltas = cached;
+                    UI.setStatus('Offline (caché)', 'connecting');
+                    Toast.show('Sin conexión — mostrando datos guardados', 'info');
+                    UI.render();
+                    Dashboard.show();
+                } else {
+                    UI.setStatus('Error', 'error');
+                    Toast.show('Error al conectar con Firestore', 'error');
+                }
+            }
         );
     },
     async add(data) {
@@ -603,6 +976,7 @@ const UI = {
         this.renderTabla();
         this.renderHistorial();
         this.renderStats();
+        WeekSummary.render();
         if (State.activeTab === 'grafico')    this.renderChart();
         if (State.activeTab === 'calendario') this.renderCalendar();
     }
@@ -650,7 +1024,10 @@ const Modals = {
             if (this._resolve) this._resolve(result);
         }
     },
-    edit: {
+    trash: {
+        open()  { Trash.cleanOld(); Trash.render(); document.getElementById('trash-modal')?.classList.add('open'); },
+        close() { document.getElementById('trash-modal')?.classList.remove('open'); }
+    },
         open(f) {
             document.getElementById('edit-id').value         = f.id;
             document.getElementById('edit-evaluacion').value = f.evaluacion || 1;
@@ -663,7 +1040,7 @@ const Modals = {
         },
         close() { document.getElementById('edit-modal').classList.remove('open'); }
     }
-};
+;
 
 /* ============================================================
    7. TOASTS
@@ -723,10 +1100,32 @@ const Actions = {
     },
 
     async pedirEliminarFalta(id) {
-        const ok = await Modals.confirm.open('Eliminar falta', '¿Seguro que quieres borrar esta falta?');
+        const ok = await Modals.confirm.open('Eliminar falta', '¿Seguro? Se moverá a la papelera durante 7 días y podrás recuperarla.');
         if (!ok) return;
-        try { await DB.delete(id); Toast.show('Falta eliminada', 'info'); }
-        catch(e) { Toast.show('Error al eliminar', 'error'); }
+        const falta = State.faltas.find(f => f.id === id);
+        if (falta) Trash.add(falta);
+        try {
+            await DB.delete(id);
+            Toast.show('Movida a la papelera — puedes recuperarla con T', 'info', 4000);
+        } catch(e) { Toast.show('Error al eliminar', 'error'); }
+    },
+
+    async restaurarFalta(id) {
+        const falta = Trash.getAll().find(f => f.id === id);
+        if (!falta) return Toast.show('No encontrada en papelera', 'error');
+        try {
+            const { id: _id, deletedAt, ...data } = falta;
+            await DB.add(data);
+            Trash.remove(id);
+            Trash.render();
+            Toast.show('Falta restaurada', 'success');
+        } catch(e) { Toast.show('Error al restaurar', 'error'); }
+    },
+
+    eliminarDefinitivo(id) {
+        Trash.remove(id);
+        Trash.render();
+        Toast.show('Eliminada definitivamente', 'info');
     },
 
     editarFalta(id) {
@@ -1086,6 +1485,29 @@ function initEvents() {
         document.getElementById('evaluacion-input').value = evalSugerida;
     });
 
+    // Trash
+    document.getElementById('btn-trash')?.addEventListener('click', () => Modals.trash.open());
+    document.getElementById('trash-close')?.addEventListener('click', () => Modals.trash.close());
+    document.getElementById('trash-backdrop')?.addEventListener('click', () => Modals.trash.close());
+    document.getElementById('btn-trash-clear')?.addEventListener('click', async () => {
+        const ok = await Modals.confirm.open('Vaciar papelera', '¿Eliminar todas las faltas de la papelera definitivamente?');
+        if (!ok) return;
+        Trash.clear();
+        Trash.render();
+        Toast.show('Papelera vaciada', 'info');
+    });
+
+    // Shortcuts modal
+    document.getElementById('btn-shortcuts')?.addEventListener('click', () => document.getElementById('shortcuts-modal')?.classList.add('open'));
+    document.getElementById('shortcuts-close')?.addEventListener('click', () => document.getElementById('shortcuts-modal')?.classList.remove('open'));
+    document.getElementById('shortcuts-backdrop')?.addEventListener('click', () => document.getElementById('shortcuts-modal')?.classList.remove('open'));
+
+    // Compact view
+    document.getElementById('btn-compact')?.addEventListener('click', () => CompactView.toggle());
+
+    // Dashboard
+    document.getElementById('btn-dashboard-enter')?.addEventListener('click', () => Dashboard.hide());
+
     // Logout
     document.getElementById('btn-logout').addEventListener('click', () => Auth.logout());
 
@@ -1120,11 +1542,13 @@ function initEvents() {
     // Calculadora
     document.getElementById('btn-simular').addEventListener('click', () => Actions.simular());
 
-    // Escape
+    // Escape — all modals
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape') return;
         Modals.registro.close(); Modals.firebase.close();
         Modals.confirm.close(false); Modals.edit.close();
+        Modals.trash.close();
+        document.getElementById('shortcuts-modal')?.classList.remove('open');
     });
 }
 
@@ -1172,6 +1596,18 @@ function initLogin() {
    11. INIT
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+    }
+
+    // Init trash badge
+    Trash.cleanOld();
+    Trash.updateBadge();
+
+    // Init keyboard shortcuts
+    Shortcuts.init();
+
     if (Auth.isLoggedIn()) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app').style.display = 'block';

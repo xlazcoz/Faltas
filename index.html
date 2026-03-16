@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#00d4ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Control de Asistencia — CIFP USURBIL</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -32,6 +36,19 @@
     </div>
 </div>
 
+<!-- ===================== DASHBOARD (post-login) ===================== -->
+<div id="dashboard-overlay" style="display:none">
+    <div class="dashboard-card">
+        <div id="dashboard-content" class="dashboard-body">
+            <div style="text-align:center;color:var(--txt-muted);padding:40px">Cargando…</div>
+        </div>
+        <div class="dashboard-footer">
+            <div class="shortcut-hint">Pulsa <kbd>?</kbd> para ver atajos de teclado</div>
+            <button id="btn-dashboard-enter" class="btn-primary">Entrar a la app →</button>
+        </div>
+    </div>
+</div>
+
 <!-- ===================== APP ===================== -->
 <div id="app" style="display:none">
     <div class="bg-grid"></div>
@@ -51,12 +68,16 @@
                     <span class="status-dot" id="status-dot"></span>
                     <span id="status-text">Conectando…</span>
                 </div>
+                <button class="btn-icon" id="btn-trash" title="Papelera (T)">🗑
+                    <span class="trash-badge" id="trash-count" style="display:none">0</span>
+                </button>
+                <button class="btn-icon" id="btn-shortcuts" title="Atajos de teclado (?)">⌨</button>
                 <button class="btn-icon" id="btn-settings" title="Configuración Firebase">⚙</button>
                 <button class="btn-ghost btn-sm" id="btn-logout">↩ Salir</button>
             </div>
         </header>
 
-        <!-- TOP STRIP: EVAL TABS + STATS + REGISTER -->
+        <!-- TOP STRIP -->
         <div class="top-strip">
             <nav class="eval-nav">
                 <button class="eval-tab active" data-eval="1">1ª Eval</button>
@@ -83,7 +104,7 @@
             </div>
         </div>
 
-        <!-- CONTENT TABS NAV -->
+        <!-- CONTENT TABS -->
         <div class="content-nav">
             <button class="content-tab active" data-tab="resumen">📋 Resumen</button>
             <button class="content-tab" data-tab="grafico">📈 Gráfico</button>
@@ -94,12 +115,19 @@
         <!-- TAB: RESUMEN -->
         <div id="tab-resumen" class="tab-panel panel active">
             <div class="panel-inner">
+
+                <!-- Week summary strip -->
+                <div id="week-summary" class="week-summary"></div>
+
                 <div class="resumen-header">
                     <h2 class="panel__title">Resumen de asistencia</h2>
-                    <div class="filter-group">
-                        <button class="btn-filter active" data-filter="all">Todas</button>
-                        <button class="btn-filter" data-filter="warning">⚠ Riesgo</button>
-                        <button class="btn-filter" data-filter="danger">🔴 Peligro</button>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                        <button id="btn-compact" class="btn-ghost btn-sm" title="Shift+C">⊟ Compactar</button>
+                        <div class="filter-group">
+                            <button class="btn-filter active" data-filter="all">Todas</button>
+                            <button class="btn-filter" data-filter="warning">⚠ Riesgo</button>
+                            <button class="btn-filter" data-filter="danger">🔴 Peligro</button>
+                        </div>
                     </div>
                 </div>
                 <div id="tabla-resumen" class="tabla-container"></div>
@@ -174,10 +202,12 @@
             </div>
         </div>
 
-    </div><!-- /container -->
-</div><!-- /app -->
+    </div>
+</div>
 
-<!-- MODAL: Registrar falta -->
+<!-- ===================== MODALS ===================== -->
+
+<!-- Registrar falta -->
 <div id="register-modal" class="modal">
     <div class="modal-backdrop" id="register-backdrop"></div>
     <div class="modal-card">
@@ -233,7 +263,7 @@
     </div>
 </div>
 
-<!-- MODAL: Editar falta -->
+<!-- Editar falta -->
 <div id="edit-modal" class="modal">
     <div class="modal-backdrop" id="edit-backdrop"></div>
     <div class="modal-card">
@@ -292,7 +322,7 @@
     </div>
 </div>
 
-<!-- MODAL: Firebase config -->
+<!-- Firebase config -->
 <div id="firebase-modal" class="modal">
     <div class="modal-backdrop" id="modal-backdrop"></div>
     <div class="modal-card">
@@ -325,7 +355,7 @@
     </div>
 </div>
 
-<!-- MODAL: Confirmación -->
+<!-- Confirmación -->
 <div id="confirm-modal" class="modal">
     <div class="modal-backdrop" id="confirm-backdrop"></div>
     <div class="modal-card modal-card--sm">
@@ -342,7 +372,50 @@
     </div>
 </div>
 
-<!-- Toasts -->
+<!-- Papelera -->
+<div id="trash-modal" class="modal">
+    <div class="modal-backdrop" id="trash-backdrop"></div>
+    <div class="modal-card modal-card--lg">
+        <div class="modal-card__header">
+            <h3>🗑 Papelera</h3>
+            <button class="modal-close" id="trash-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <p class="modal-hint">Las faltas eliminadas se recuperan hasta 7 días después.</p>
+            <div id="trash-list" class="historial-grid" style="max-height:400px;overflow-y:auto"></div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px">
+                <button id="btn-trash-clear" class="btn-danger-ghost btn-sm">Vaciar papelera</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Atajos de teclado -->
+<div id="shortcuts-modal" class="modal">
+    <div class="modal-backdrop" id="shortcuts-backdrop"></div>
+    <div class="modal-card modal-card--sm">
+        <div class="modal-card__header">
+            <h3>⌨ Atajos de teclado</h3>
+            <button class="modal-close" id="shortcuts-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <div class="shortcuts-grid">
+                <div class="shortcut-row"><kbd>N</kbd><span>Nueva falta</span></div>
+                <div class="shortcut-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><span>Cambiar evaluación</span></div>
+                <div class="shortcut-row"><kbd>G</kbd><span>Vista Global</span></div>
+                <div class="shortcut-row"><kbd>R</kbd><span>Pestaña Resumen</span></div>
+                <div class="shortcut-row"><kbd>P</kbd><span>Pestaña Gráfico</span></div>
+                <div class="shortcut-row"><kbd>C</kbd><span>Pestaña Calendario</span></div>
+                <div class="shortcut-row"><kbd>K</kbd><span>Pestaña Calculadora</span></div>
+                <div class="shortcut-row"><kbd>Shift</kbd><kbd>C</kbd><span>Vista compacta</span></div>
+                <div class="shortcut-row"><kbd>T</kbd><span>Papelera</span></div>
+                <div class="shortcut-row"><kbd>?</kbd><span>Esta ayuda</span></div>
+                <div class="shortcut-row"><kbd>Esc</kbd><span>Cerrar modal</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="toast-container" aria-live="polite"></div>
 
 <script src="script.js"></script>
