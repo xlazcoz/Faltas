@@ -1198,9 +1198,8 @@ select option { background: var(--bg-panel-2); }
     .content-tab { padding: 10px 14px; font-size: 0.82rem; }
 }
 
-/* ============================================================
-   DASHBOARD (post-login)
-   ============================================================ */
+/* Confirm modal always on top */
+#confirm-modal { z-index: 900; }
 #dashboard-overlay {
     position: fixed;
     inset: 0;
@@ -1500,3 +1499,63 @@ kbd {
     color: var(--cyan);
     box-shadow: 0 2px 0 rgba(0,212,255,0.15);
 }
+
+/* ============================================================
+   CALENDAR SCHEDULE (double-click day view)
+   ============================================================ */
+.schedule-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg-panel-3);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 8px;
+}
+.schedule-row:hover {
+    border-color: rgba(0,212,255,0.25);
+    background: rgba(0,212,255,0.04);
+    transform: translateX(2px);
+}
+.schedule-row--done {
+    opacity: 0.45;
+    pointer-events: none;
+    border-style: dashed;
+}
+.schedule-row:last-of-type { margin-bottom: 0; }
+
+/* Double-click hint on calendar days */
+.cal-day:not(.cal-day--empty):not(.cal-day--finde):not(.cal-day--festivo):not(.cal-day--examen)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s;
+    pointer-events: none;
+}
+.cal-day:not(.cal-day--empty):not(.cal-day--finde):not(.cal-day--festivo):not(.cal-day--examen):hover::after {
+    border-color: rgba(0,212,255,0.15);
+}
+.cal-day { position: relative; }
+
+/* Lectivo day double-click hint */
+.cal-day--lectivo { cursor: pointer; }
+
+.cal-day__hint {
+    position: absolute;
+    bottom: 4px;
+    right: 5px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--cyan);
+    opacity: 0;
+    transition: opacity 0.15s;
+    line-height: 1;
+    pointer-events: none;
+}
+.cal-day--lectivo:hover .cal-day__hint { opacity: 0.5; }
+.cal-day--lectivo:active { background: rgba(0,212,255,0.06); }

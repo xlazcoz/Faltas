@@ -354,9 +354,6 @@ const Dashboard = {
     }
 };
 
-/* ============================================================
-   WEEK SUMMARY
-   ============================================================ */
 const WeekSummary = {
     render() {
         const container = document.getElementById('week-summary');
@@ -368,21 +365,13 @@ const WeekSummary = {
         weekStart.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
         weekStart.setHours(0, 0, 0, 0);
 
-        const dayLabels = ['L', 'M', 'X', 'J', 'V'];
-        const dayDates  = Array.from({ length: 5 }, (_, i) => {
-            const d = new Date(weekStart);
-            d.setDate(weekStart.getDate() + i);
-            return d;
-        });
-
-        const horasSemanales = dayDates.reduce((total, d) => {
-            const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            if (tipoDia(ds)) return total;
-            return total + Object.values(CONFIG.horasDiarias[d.getDay()] || {}).reduce((s, h) => s + h, 0);
-        }, 0);
-
         const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 4);
+        weekEnd.setDate(weekStart.getDate() + 6);
+
+        // Total lectivo hours this week
+        const horasSemanales = [1,2,3,4,5].reduce((total, d) => {
+            return total + Object.values(CONFIG.horasDiarias[d] || {}).reduce((s, h) => s + h, 0);
+        }, 0);
 
         const thisWeekFaltas = State.faltasVisibles.filter(f => {
             if (!f.fecha) return false;
@@ -391,28 +380,46 @@ const WeekSummary = {
         });
         const horasFaltadas = thisWeekFaltas.reduce((s, f) => s + (f.horas || 0), 0);
 
+        const dayLabels = ['L', 'M', 'X', 'J', 'V'];
+        const dayDates  = Array.from({ length: 5 }, (_, i) => {
+            const d = new Date(weekStart);
+            d.setDate(weekStart.getDate() + i);
+            return d;
+        });
+
         const pills = dayDates.map((d, i) => {
-            const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            const td = tipoDia(ds);
-            const isToday   = d.toDateString() === now.toDateString();
-            const isPast    = d < now && !isToday;
+            const y  = d.getFullYear();
+            const m  = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const ds = `${y}-${m}-${dd}`;
+            const td      = tipoDia(ds);
+            const isToday = d.toDateString() === now.toDateString();
             const faltasDay = thisWeekFaltas.filter(f => f.fecha === ds);
             const hasFaltas = faltasDay.length > 0;
-            const horasDia  = faltasDay.reduce((s, f) => s + (f.horas || 0), 0);
+            const isNoLectivo = td && td.tipo !== 'finde';
+            const isFinde     = td && td.tipo === 'finde';
 
-            let cls  = 'week-day';
-            let style = '';
-            let sub  = d.getDate();
+            // Colored dots like calendar
+            const dots = faltasDay.map(f => {
+                const c = CONFIG.colors[f.asignatura] || '#64748b';
+                return `<span style="width:7px;height:7px;border-radius:50%;background:${c};box-shadow:0 0 4px ${c};display:inline-block;flex-shrink:0"></span>`;
+            }).join('');
 
-            if (isToday) cls += ' week-day--today';
-            if (td && td.tipo !== 'finde') { cls += ' week-day--special'; style = 'opacity:0.35'; }
-            else if (hasFaltas) { cls += ' week-day--faltas'; }
-            else if (isPast && !td) { cls += ' week-day--ok'; }
+            const numColor = isNoLectivo || isFinde ? '#ff4060' :
+                             hasFaltas ? 'var(--red)' :
+                             isToday   ? 'var(--cyan)' : 'var(--txt-secondary)';
 
-            return `<div class="${cls}" style="${style}" title="${d.toLocaleDateString('es-ES')}${hasFaltas ? ` — ${horasDia}h faltadas` : ''}">
+            let cls = 'week-day';
+            if (isToday)     cls += ' week-day--today';
+            if (hasFaltas)   cls += ' week-day--faltas';
+            if (isNoLectivo) cls += ' week-day--special';
+
+            return `<div class="${cls}" title="${d.toLocaleDateString('es-ES')}${isNoLectivo ? ' — ' + td.label : ''}${hasFaltas ? ' — ' + faltasDay.reduce((s,f)=>s+f.horas,0) + 'h faltadas' : ''}">
                 <span class="week-day__label">${dayLabels[i]}</span>
-                <span class="week-day__num">${sub}</span>
-                ${hasFaltas ? `<span class="week-day__hours">${horasDia}h</span>` : ''}
+                <span class="week-day__num" style="color:${numColor}">${d.getDate()}</span>
+                <div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;min-height:14px">
+                    ${isNoLectivo ? `<span style="font-size:0.65rem;opacity:0.5">${td.tipo === 'festivo' ? '✕' : td.tipo === 'examen' ? '📝' : '🏢'}</span>` : dots}
+                </div>
             </div>`;
         }).join('');
 
@@ -933,12 +940,17 @@ const UI = {
                 return `<span class="cal-dot" style="background:${c};box-shadow:0 0 3px ${c}"></span>`;
             }).join('');
 
-            const titleAttr = tooltip ? `title="${tooltip}"` : '';
+            const dayOfWeek   = new Date(year, month, day).getDay(); // 0=dom…6=sab
+            const isLectivo   = !td && dayOfWeek >= 1 && dayOfWeek <= 5;
+            const titleAttr   = tooltip
+                ? `title="${tooltip}"`
+                : isLectivo ? `title="Click: ver faltas · Doble click: añadir falta"` : '';
             const onclickAttr = (clickable || hasFaltas) ? `onclick="Actions.showCalDay(${day}, ${year}, ${month})"` : '';
+            const dblclickAttr = isLectivo ? `ondblclick="event.stopPropagation();Actions.showDaySchedule(${day}, ${year}, ${month})"` : '';
 
             html += `
-            <div class="cal-day${isToday ? ' cal-day--today' : ''}${hasFaltas ? ' cal-day--has-faltas' : ''} ${extraClass}"
-                 ${titleAttr} ${onclickAttr}>
+            <div class="cal-day${isToday ? ' cal-day--today' : ''}${hasFaltas ? ' cal-day--has-faltas' : ''}${isLectivo ? ' cal-day--lectivo' : ''} ${extraClass}"
+                 ${titleAttr} ${onclickAttr} ${dblclickAttr}>
                 <span class="cal-day__num">${day}</span>
                 ${td && td.tipo !== 'finde' && !hasFaltas
                     ? `<span class="cal-day__label">${
@@ -948,6 +960,7 @@ const UI = {
                       }</span>`
                     : `<div class="cal-day__dots">${dots}</div>`
                 }
+                ${isLectivo ? `<span class="cal-day__hint">+</span>` : ''}
             </div>`;
         }
 
@@ -1028,6 +1041,7 @@ const Modals = {
         open()  { Trash.cleanOld(); Trash.render(); document.getElementById('trash-modal')?.classList.add('open'); },
         close() { document.getElementById('trash-modal')?.classList.remove('open'); }
     },
+    edit: {
         open(f) {
             document.getElementById('edit-id').value         = f.id;
             document.getElementById('edit-evaluacion').value = f.evaluacion || 1;
@@ -1040,7 +1054,7 @@ const Modals = {
         },
         close() { document.getElementById('edit-modal').classList.remove('open'); }
     }
-;
+};
 
 /* ============================================================
    7. TOASTS
@@ -1227,6 +1241,119 @@ const Actions = {
         State.calMonth++;
         if (State.calMonth > 11) { State.calMonth = 0; State.calYear++; }
         UI.renderCalendar();
+    },
+
+    showDaySchedule(day, year, month) {
+        const detail = document.getElementById('cal-detail');
+        if (!detail) return;
+
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const date    = new Date(dateStr + 'T00:00:00');
+        const dow     = date.getDay(); // 1=Mon…5=Fri
+        const schedule = CONFIG.horasDiarias[dow] || {};
+        const keys    = Object.keys(schedule);
+        const dateFormatted = date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+
+        // Already existing faltas on this day
+        const existingFaltas = State.faltas.filter(f => f.fecha === dateStr);
+
+        if (keys.length === 0) {
+            detail.style.display = 'block';
+            detail.innerHTML = `<div class="cal-detail__title">${dateFormatted}</div>
+                <div style="color:var(--txt-muted);font-size:0.85rem;padding:8px 0">No hay clases este día.</div>`;
+            return;
+        }
+
+        // Detect eval for this date
+        let evalNum = 1;
+        if (dateStr >= '2025-11-24' && dateStr <= '2026-03-06') evalNum = 2;
+        else if (dateStr >= '2026-03-09') evalNum = 3;
+
+        const scheduleRows = keys.map(key => {
+            const color   = CONFIG.colors[key] || '#64748b';
+            const horas   = schedule[key];
+            const asig    = CONFIG.asignaturas[key];
+            const yaFaltó = existingFaltas.find(f => f.asignatura === key);
+            const s       = State.calcStats(key);
+            const badgeCls = s.estado === 'danger' ? 'badge--danger' : s.estado === 'warning' ? 'badge--warning' : 'badge--ok';
+            const badgeTxt = s.estado === 'danger' ? '⛔' : s.estado === 'warning' ? '⚠' : '✓';
+
+            return `
+            <div class="schedule-row${yaFaltó ? ' schedule-row--done' : ''}"
+                 onclick="Actions.quickRegister('${key}', '${dateStr}', ${horas}, ${evalNum})"
+                 title="Click para registrar falta de ${key}">
+                <span class="td-dot" style="background:${color};box-shadow:0 0 6px ${color};width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0"></span>
+                <div style="flex:1">
+                    <div style="font-weight:600;font-size:0.88rem;color:var(--txt-primary)">${asig.nombre}</div>
+                    <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--txt-secondary)">${horas}h · ${s.horasRestantes}h disponibles</div>
+                </div>
+                <span class="badge ${badgeCls}" style="font-size:0.68rem">${badgeTxt}</span>
+                ${yaFaltó
+                    ? `<span style="font-size:0.72rem;color:var(--txt-muted);font-family:var(--font-mono)">ya registrado</span>`
+                    : `<button class="btn-ghost btn-sm" style="font-size:0.72rem" onclick="event.stopPropagation();Actions.quickRegister('${key}','${dateStr}',${horas},${evalNum})">+ Falta</button>`
+                }
+            </div>`;
+        }).join('');
+
+        // Total hours that day
+        const totalHorasDia = keys.reduce((s, k) => s + schedule[k], 0);
+
+        detail.style.display = 'block';
+        detail.innerHTML = `
+            <div class="cal-detail__title">
+                📅 ${dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1)}
+                <span style="font-size:0.75rem;color:var(--txt-muted);font-weight:400;margin-left:8px;font-family:var(--font-mono)">${totalHorasDia}h de clase</span>
+            </div>
+            <div style="font-size:0.72rem;color:var(--txt-muted);font-family:var(--font-mono);margin-bottom:12px">
+                Click en una asignatura para registrar falta · Doble click en el día para esta vista
+            </div>
+            ${scheduleRows}
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+                <button class="btn-primary btn-full" onclick="Actions.faltarTodoDia('${dateStr}', ${evalNum})"
+                    style="font-size:0.85rem;padding:10px">
+                    📋 Faltar todo el día (${totalHorasDia}h)
+                </button>
+            </div>`;
+    },
+
+    quickRegister(key, dateStr, horas, evalNum) {
+        // Open register modal pre-filled
+        Modals.registro.open();
+        setTimeout(() => {
+            document.getElementById('fecha').value            = dateStr;
+            document.getElementById('asignatura').value       = key;
+            document.getElementById('horas').value            = horas;
+            document.getElementById('evaluacion-input').value = evalNum;
+            // Trigger hint update
+            document.getElementById('fecha').dispatchEvent(new Event('change'));
+        }, 50);
+    },
+
+    async faltarTodoDia(dateStr, evalNum) {
+        const date  = new Date(dateStr + 'T00:00:00');
+        const dow   = date.getDay();
+        const sched = CONFIG.horasDiarias[dow] || {};
+        const keys  = Object.keys(sched);
+        if (keys.length === 0) return Toast.show('No hay clases este día', 'info');
+
+        const dateFormatted = date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        const totalH = keys.reduce((s, k) => s + sched[k], 0);
+
+        const ok = await Modals.confirm.open(
+            '📋 Faltar todo el día',
+            `¿Registrar falta en todas las asignaturas del ${dateFormatted}? (${keys.join(', ')} — ${totalH}h en total)`
+        );
+        if (!ok) return;
+
+        let registradas = 0;
+        for (const key of keys) {
+            try {
+                await DB.add({ asignatura: key, fecha: dateStr, horas: sched[key], evaluacion: evalNum, tipo: 'injustificada', nota: '' });
+                registradas++;
+            } catch(e) { console.error(e); }
+        }
+
+        Toast.show(`${registradas} faltas registradas (${totalH}h)`, 'success');
     },
 
     showCalDay(day, year, month) {
