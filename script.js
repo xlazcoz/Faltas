@@ -265,21 +265,45 @@ const Dashboard = {
         const content = document.getElementById('dashboard-content');
         if (!content) return;
 
-        const now  = new Date();
-        const hour = now.getHours();
+        const now = new Date();
+        const ny  = now.getFullYear();
+        const nm  = String(now.getMonth() + 1).padStart(2, '0');
+        const nd  = String(now.getDate()).padStart(2, '0');
+        const hoyStr = `${ny}-${nm}-${nd}`;
+
+        let dashEval = 1;
+        if (hoyStr >= '2025-11-24' && hoyStr <= '2026-03-06') dashEval = 2;
+        else if (hoyStr >= '2026-03-09') dashEval = 3;
+
+        // Calculate stats for a subject using dashEval directly (no State mutation)
+        const calcDashStats = (key) => {
+            const asig   = CONFIG.asignaturas[key];
+            const totalH = dashEval === 'total'
+                ? asig.eval[1] + asig.eval[2] + asig.eval[3]
+                : asig.eval[dashEval];
+            const lista  = State.faltas.filter(f =>
+                f.asignatura === key && Number(f.evaluacion) === dashEval
+            );
+            const horasFaltadas  = lista.reduce((s, f) => s + (f.horas || 0), 0);
+            const pct            = totalH > 0 ? (horasFaltadas / totalH) * 100 : 0;
+            const limiteH        = Math.floor(totalH * CONFIG.limitePct / 100);
+            const horasRestantes = Math.max(0, limiteH - horasFaltadas);
+            let estado = 'ok';
+            if (horasFaltadas >= limiteH)          estado = 'danger';
+            else if (horasFaltadas >= limiteH / 2) estado = 'warning';
+            return { pct, horasRestantes, estado };
+        };
+
+        const hour    = now.getHours();
         const greeting = hour < 12 ? '🌅 Buenos días' : hour < 20 ? '☀️ Buenas tardes' : '🌙 Buenas noches';
-        const dateStr = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        const dateStr  = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
         // Today's classes
-        const y  = now.getFullYear();
-        const m  = String(now.getMonth() + 1).padStart(2, '0');
-        const d  = String(now.getDate()).padStart(2, '0');
-        const hoyStr = `${y}-${m}-${d}`;
-        const tdHoy  = tipoDia(hoyStr);
+        const tdHoy   = tipoDia(hoyStr);
         const hoyAsig = tdHoy ? [] : asignaturasDelDia(now);
 
-        // At-risk subjects
-        const enRiesgo = Object.keys(CONFIG.asignaturas).filter(k => State.calcStats(k).estado !== 'ok');
+        // At-risk subjects using dashEval
+        const enRiesgo = Object.keys(CONFIG.asignaturas).filter(k => calcDashStats(k).estado !== 'ok');
 
         // This week's absences
         const dow = now.getDay();
@@ -316,7 +340,7 @@ const Dashboard = {
         const riesgoHTML = enRiesgo.length === 0
             ? '<div class="dash-ok">✅ Todas las asignaturas en estado correcto</div>'
             : enRiesgo.map(k => {
-                const s = State.calcStats(k);
+                const s = calcDashStats(k);
                 const color = s.estado === 'danger' ? 'var(--red)' : 'var(--amber)';
                 const icon  = s.estado === 'danger' ? '⛔' : '⚠️';
                 return `<div class="dash-alert-item" style="border-color:${s.estado === 'danger' ? 'rgba(255,64,96,0.25)' : 'rgba(255,184,48,0.25)'}">
@@ -347,7 +371,7 @@ const Dashboard = {
             </div>
 
             <div class="dash-section">
-                <div class="dash-section-title">Estado de asignaturas</div>
+                <div class="dash-section-title">Estado de asignaturas <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--txt-muted)">(Eval ${dashEval})</span></div>
                 <div class="dash-alerts">${riesgoHTML}</div>
             </div>
         `;
@@ -539,7 +563,6 @@ const DB = {
                 Offline.save(State.faltas);
                 UI.setStatus('Conectado', 'connected');
                 UI.render();
-                Dashboard.show();
             },
             err => {
                 console.error(err);
@@ -549,7 +572,6 @@ const DB = {
                     UI.setStatus('Offline (caché)', 'connecting');
                     Toast.show('Sin conexión — mostrando datos guardados', 'info');
                     UI.render();
-                    Dashboard.show();
                 } else {
                     UI.setStatus('Error', 'error');
                     Toast.show('Error al conectar con Firestore', 'error');
@@ -940,13 +962,12 @@ const UI = {
                 return `<span class="cal-dot" style="background:${c};box-shadow:0 0 3px ${c}"></span>`;
             }).join('');
 
-            const dayOfWeek   = new Date(year, month, day).getDay(); // 0=dom…6=sab
-            const isLectivo   = !td && dayOfWeek >= 1 && dayOfWeek <= 5;
-            const titleAttr   = tooltip
-                ? `title="${tooltip}"`
-                : isLectivo ? `title="Click: ver faltas · Doble click: añadir falta"` : '';
-            const onclickAttr = (clickable || hasFaltas) ? `onclick="Actions.showCalDay(${day}, ${year}, ${month})"` : '';
-            const dblclickAttr = isLectivo ? `ondblclick="event.stopPropagation();Actions.showDaySchedule(${day}, ${year}, ${month})"` : '';
+            const dayOfWeek    = new Date(year, month, day).getDay();
+            const isLectivo    = !td && dayOfWeek >= 1 && dayOfWeek <= 5;
+            const titleAttr    = isLectivo ? `title="Click: ver faltas · Doble click: añadir falta"` : (tooltip ? `title="${tooltip}"` : '');
+            const onclickAttr  = (clickable || hasFaltas) ? `onclick="Actions.showCalDay(${day}, ${year}, ${month})"` : '';
+            const dblclickAttr = isLectivo ? `ondblclick="Actions.showDaySchedule(${day}, ${year}, ${month})"` : '';
+            const lectivoclickAttr = '';
 
             html += `
             <div class="cal-day${isToday ? ' cal-day--today' : ''}${hasFaltas ? ' cal-day--has-faltas' : ''}${isLectivo ? ' cal-day--lectivo' : ''} ${extraClass}"
@@ -1632,9 +1653,6 @@ function initEvents() {
     // Compact view
     document.getElementById('btn-compact')?.addEventListener('click', () => CompactView.toggle());
 
-    // Dashboard
-    document.getElementById('btn-dashboard-enter')?.addEventListener('click', () => Dashboard.hide());
-
     // Logout
     document.getElementById('btn-logout').addEventListener('click', () => Auth.logout());
 
@@ -1682,6 +1700,20 @@ function initEvents() {
 /* ============================================================
    10. LOGIN
    ============================================================ */
+
+function autoSetEval() {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    const ds = `${y}-${m}-${d}`;
+
+    let eval_ = 1;
+    if (ds >= '2025-11-24' && ds <= '2026-03-06') eval_ = 2;
+    else if (ds >= '2026-03-09') eval_ = 3;
+
+    State.evaluacion = eval_;
+}
 function initLogin() {
     const doLogin = () => {
         const user    = document.getElementById('login-user').value.trim();
@@ -1703,6 +1735,7 @@ function initLogin() {
                 app.style.transition = 'opacity 0.4s ease';
                 requestAnimationFrame(() => { app.style.opacity = '1'; });
 
+                autoSetEval();
                 initEvents();
                 UI.render();
                 DB.init();
@@ -1738,6 +1771,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Auth.isLoggedIn()) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
+        autoSetEval();
         initEvents();
         UI.render();
         DB.init();

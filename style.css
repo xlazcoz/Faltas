@@ -1546,16 +1546,15 @@ kbd {
 .cal-day--lectivo { cursor: pointer; }
 
 .cal-day__hint {
-    position: absolute;
-    bottom: 4px;
-    right: 5px;
-    font-size: 0.7rem;
-    font-weight: 700;
+    font-size: 1.6rem;
+    font-weight: 900;
     color: var(--cyan);
     opacity: 0;
     transition: opacity 0.15s;
     line-height: 1;
     pointer-events: none;
+    text-shadow: 0 0 12px var(--cyan);
+    margin-top: auto;
 }
-.cal-day--lectivo:hover .cal-day__hint { opacity: 0.5; }
+.cal-day--lectivo:hover .cal-day__hint { opacity: 0.85; }
 .cal-day--lectivo:active { background: rgba(0,212,255,0.06); }
