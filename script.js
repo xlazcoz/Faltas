@@ -841,6 +841,7 @@ const Modals = {
         open() {
             document.getElementById('register-modal').classList.add('open');
             const fecha = document.getElementById('fecha');
+            fecha.max = CONFIG.practicas.end;
             fecha.valueAsDate = new Date();
             // Disparar autosugerencia con la fecha de hoy
             fecha.dispatchEvent(new Event('change'));
@@ -883,6 +884,7 @@ const Modals = {
         open(f) {
             document.getElementById('edit-id').value         = f.id;
             document.getElementById('edit-evaluacion').value = f.evaluacion || 1;
+            document.getElementById('edit-fecha').max        = CONFIG.practicas.end;
             document.getElementById('edit-fecha').value      = f.fecha || '';
             document.getElementById('edit-asignatura').value = f.asignatura || '';
             document.getElementById('edit-horas').value      = f.horas || 2;
@@ -909,6 +911,9 @@ const Actions = {
         if (!asignatura) return Toast.show('Selecciona una asignatura', 'error');
         if (!fecha)      return Toast.show('Elige una fecha', 'error');
         if (isNaN(horas) || horas < 1) return Toast.show('Horas inválidas', 'error');
+        if (fecha > CONFIG.practicas.end) {
+            return Toast.show(`No hay clases después del ${new Date(CONFIG.practicas.end + 'T00:00:00').toLocaleDateString('es-ES')} (fin de curso)`, 'error', 4500);
+        }
 
         const statsBefore = State.calcStats(asignatura);
 
@@ -975,6 +980,9 @@ const Actions = {
         const nota       = document.getElementById('edit-nota').value.trim();
 
         if (!fecha || !asignatura || isNaN(horas)) return Toast.show('Rellena todos los campos', 'error');
+        if (fecha > CONFIG.practicas.end) {
+            return Toast.show(`No hay clases después del ${new Date(CONFIG.practicas.end + 'T00:00:00').toLocaleDateString('es-ES')} (fin de curso)`, 'error', 4500);
+        }
         try {
             await DB.faltas.update(id, { evaluacion, fecha, asignatura, horas, tipo, nota });
             Modals.edit.close();

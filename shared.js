@@ -22,7 +22,7 @@ const HORARIO_BLOQUES = {
         { key: '_libre', start: 9, span: 4 }, // 12:30-14:30
     ],
     3: [ // Miércoles
-        { key: 'WI',   start: 0, span: 2 }, // 08:00-09:00
+        { key: 'Info', start: 0, span: 2 }, // 08:00-09:00
         { key: 'Bezer', start: 2, span: 4 }, // 09:00-11:00
         { key: '_desc', start: 6, span: 1 },
         { key: 'Zerb', start: 7, span: 4 }, // 11:30-13:30
@@ -121,6 +121,8 @@ const CONFIG = {
         rango('2026-12-19', '2027-01-06'); // Navidades + Reyes
         rango('2027-01-20', '2027-01-20'); // Tamborrada
         rango('2027-02-08', '2027-02-14'); // Semana de Carnaval
+        rango('2027-03-25', '2027-03-26'); // Jueves y Viernes Santo
+        rango('2027-03-29', '2027-03-29'); // Lunes de Pascua (Aberri Eguna)
         return dias;
     })(),
 

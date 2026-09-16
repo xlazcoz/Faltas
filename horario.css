@@ -606,40 +606,99 @@
    MODO IMPRESIÓN
    ============================================================ */
 @media print {
-    body { background: #fff !important; }
+    @page { size: landscape; margin: 8mm; }
+
+    html, body {
+        background: #fff !important;
+        width: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    body::before, body::after { display: none !important; }
+
     .bg-grid, .now-widget, .hint-bar, .legend-panel,
     .info-panel, .empty-hint, .schedule-panel-mobile,
     .db-badge, .page-nav, #btn-print { display: none !important; }
+
+    #app, .container {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+
+    /* Todo en un único bloque para que no se parta entre header y tabla */
+    .site-header, .schedule-panel { break-inside: avoid; page-break-inside: avoid; }
 
     .site-header {
         background: #fff !important;
         border: 1px solid #ccc !important;
         box-shadow: none !important;
+        padding: 6px 14px !important;
+        margin-bottom: 6px !important;
+        min-height: 0 !important;
     }
     .site-header::before { display: none; }
-    .site-header h1, .site-header p { color: #000 !important; -webkit-text-fill-color: #000 !important; background: none !important; }
-    .logo-mark { box-shadow: none !important; animation: none !important; }
+    .site-header h1 { font-size: 1rem !important; color: #000 !important; -webkit-text-fill-color: #000 !important; background: none !important; }
+    .site-header p { font-size: 0.65rem !important; color: #333 !important; margin: 0 !important; }
+    .logo-mark { box-shadow: none !important; animation: none !important; width: 28px !important; height: 28px !important; font-size: 0.75rem !important; }
+    .header-left { gap: 10px !important; }
 
-    .schedule-panel { display: block !important; box-shadow: none !important; border: 1px solid #ccc !important; }
-    .schedule-grid { min-width: 0 !important; }
+    .schedule-panel {
+        display: block !important;
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
+    .schedule-panel .panel-inner {
+        padding: 6px !important;
+        overflow: visible !important;
+    }
 
-    .sg-day-header { color: #000 !important; border-bottom-color: #000 !important; background: none !important; }
+    /* Columnas sin ancho mínimo forzado: se reparten el ancho real de la página */
+    .schedule-grid {
+        min-width: 0 !important;
+        width: 100% !important;
+        grid-template-columns: 38px repeat(5, 1fr) !important;
+        grid-template-rows: 20px repeat(13, 19px) !important;
+        gap: 1px !important;
+        overflow: visible !important;
+    }
+
+    .sg-day-header {
+        color: #000 !important;
+        border-bottom-color: #000 !important;
+        background: none !important;
+        font-size: 0.66rem !important;
+        padding: 2px !important;
+    }
     .sg-day-header--today { color: #000 !important; }
     .sg-today-dot, .sg-today-band { display: none !important; }
-    .sg-time { color: #444 !important; }
+    .sg-time { color: #444 !important; font-size: 0.52rem !important; padding-right: 4px !important; }
+
+    .sg-block {
+        padding: 1px 4px !important;
+        font-size: 0.56rem !important;
+        line-height: 1.05 !important;
+        border-radius: 3px !important;
+        gap: 0 !important;
+    }
+    .sg-block__title { font-weight: 700 !important; }
+    .sg-block__prof { font-size: 0.46rem !important; }
 
     .sg-block--clase {
         color: #000 !important;
         background: #f4f4f4 !important;
         border: 1px solid #999 !important;
-        border-left: 4px solid var(--asig-color, #666) !important;
+        border-left: 3px solid var(--asig-color, #666) !important;
     }
     .sg-block--active, .sg-block--dimmed { box-shadow: none !important; filter: none !important; opacity: 1 !important; transform: none !important; }
     .sg-fill { display: none !important; }
-    .sg-block__prof { color: #444 !important; }
 
-    .sg-block--break { background: repeating-linear-gradient(45deg,#eee,#eee 5px,#fff 5px,#fff 10px) !important; color: #666 !important; border: 1px solid #ccc !important; }
-    .sg-block--libre { border: 1px dashed #ccc !important; color: #999 !important; }
-
-    .container { padding: 10px !important; max-width: 100% !important; }
+    .sg-block--break { background: repeating-linear-gradient(45deg,#eee,#eee 4px,#fff 4px,#fff 8px) !important; color: #666 !important; border: 1px solid #ccc !important; font-size: 0.48rem !important; }
+    .sg-block--libre { border: 1px dashed #ccc !important; color: #999 !important; font-size: 0.44rem !important; }
 }

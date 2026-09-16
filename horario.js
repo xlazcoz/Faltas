@@ -343,7 +343,7 @@ function renderScheduleGrid() {
         });
     });
 
-    grid.style.gridTemplateRows = `auto repeat(13, 34px)`;
+    grid.style.gridTemplateRows = `auto repeat(13, var(--row-height, 34px))`;
     grid.innerHTML = html;
 }
 
@@ -535,6 +535,9 @@ async function registrarFaltaDesdeHorario() {
     if (!asignatura) return Toast.show('Selecciona una asignatura', 'error');
     if (!fecha)      return Toast.show('Elige una fecha', 'error');
     if (isNaN(horas) || horas < 1) return Toast.show('Horas inválidas', 'error');
+    if (fecha > CONFIG.practicas.end) {
+        return Toast.show(`No hay clases después del ${new Date(CONFIG.practicas.end + 'T00:00:00').toLocaleDateString('es-ES')} (fin de curso)`, 'error', 4500);
+    }
 
     try {
         await DB.faltas.add({ asignatura, fecha, horas, evaluacion, tipo, nota });
@@ -617,6 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderNowWidget();
     populateAsigSelect();
     initHorarioEvents();
+    document.getElementById('fecha').max = CONFIG.practicas.end;
     document.getElementById('fecha').valueAsDate = new Date();
 
     initFirebaseHorario();
