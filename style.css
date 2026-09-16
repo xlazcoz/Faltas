@@ -782,12 +782,13 @@ td {
 }
 
 .cal-day--examen {
-    background: rgba(255,184,48,0.07);
-    border-color: rgba(255,184,48,0.15) !important;
-    cursor: default;
-    pointer-events: none;
+    background: rgba(255,184,48,0.06);
+    border-color: rgba(255,184,48,0.18) !important;
 }
-.cal-day--examen .cal-day__num { color: var(--amber); opacity: 0.7; }
+.cal-day--examen .cal-day__num { color: var(--amber); }
+.cal-day--examen:hover {
+    background: rgba(255,184,48,0.1);
+}
 
 .cal-day--practica {
     background: rgba(183,148,244,0.07);
@@ -1528,7 +1529,7 @@ kbd {
 .schedule-row:last-of-type { margin-bottom: 0; }
 
 /* Double-click hint on calendar days */
-.cal-day:not(.cal-day--empty):not(.cal-day--finde):not(.cal-day--festivo):not(.cal-day--examen)::after {
+.cal-day:not(.cal-day--empty):not(.cal-day--finde):not(.cal-day--festivo)::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -1537,7 +1538,7 @@ kbd {
     transition: border-color 0.15s;
     pointer-events: none;
 }
-.cal-day:not(.cal-day--empty):not(.cal-day--finde):not(.cal-day--festivo):not(.cal-day--examen):hover::after {
+.cal-day:not(.cal-day--empty):not(.cal-day--finde):not(.cal-day--festivo):hover::after {
     border-color: rgba(0,212,255,0.15);
 }
 .cal-day { position: relative; }
@@ -1558,3 +1559,226 @@ kbd {
 }
 .cal-day--lectivo:hover .cal-day__hint { opacity: 0.85; }
 .cal-day--lectivo:active { background: rgba(0,212,255,0.06); }
+
+/* ============================================================
+   SELECTOR SCREEN (index.html landing)
+   ============================================================ */
+#selector-screen {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: hidden;
+}
+
+.selector-wrap {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 900px;
+    width: 100%;
+}
+
+.selector-header { margin-bottom: 44px; }
+.selector-header .logo-mark {
+    margin: 0 auto 20px;
+    width: 64px; height: 64px;
+    font-size: 1.4rem;
+}
+.selector-header h1 {
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    font-weight: 800;
+    background: linear-gradient(90deg, #fff 40%, var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+}
+.selector-header p {
+    font-family: var(--font-mono);
+    color: var(--txt-secondary);
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+/* ============================================================
+   POSTER CARDS — estilo selector de modo (Fortnite-like)
+   ============================================================ */
+.selector-cards {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+    justify-content: center;
+    perspective: 1200px;
+}
+
+.selector-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    text-align: center;
+    width: 300px;
+    height: 420px;
+    padding: 0 24px 32px;
+    border-radius: var(--radius-xl);
+    text-decoration: none;
+    color: var(--txt-primary);
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(8,11,18,0) 0%, rgba(8,11,18,0.75) 55%, rgba(8,11,18,0.95) 100%),
+        radial-gradient(circle at 50% 30%, rgba(0,212,255,0.16) 0%, transparent 60%),
+        var(--bg-panel);
+    border: 1px solid rgba(0,212,255,0.22);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    transition: transform 0.35s cubic-bezier(.2,.8,.2,1), box-shadow 0.35s ease, border-color 0.35s ease;
+}
+
+.selector-card--horario {
+    background:
+        linear-gradient(180deg, rgba(8,11,18,0) 0%, rgba(8,11,18,0.75) 55%, rgba(8,11,18,0.95) 100%),
+        radial-gradient(circle at 50% 30%, rgba(255,45,155,0.16) 0%, transparent 60%),
+        var(--bg-panel);
+    border-color: rgba(255,45,155,0.22);
+}
+
+/* Neon top border */
+.selector-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 12%; right: 12%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.7;
+}
+.selector-card--horario::after {
+    background: linear-gradient(90deg, transparent, var(--magenta), transparent);
+}
+
+/* Ambient glow blob behind icon */
+.selector-card__glow {
+    position: absolute;
+    top: 18%;
+    left: 50%;
+    width: 220px; height: 220px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--cyan) 0%, transparent 70%);
+    opacity: 0.18;
+    filter: blur(40px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    pointer-events: none;
+}
+.selector-card--horario .selector-card__glow {
+    background: radial-gradient(circle, var(--magenta) 0%, transparent 70%);
+}
+
+.selector-card__icon {
+    position: relative;
+    font-size: 4.5rem;
+    margin-top: 64px;
+    margin-bottom: auto;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.5));
+    transition: transform 0.35s cubic-bezier(.2,.8,.2,1);
+}
+
+.selector-card__body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.selector-card__title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.3px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+}
+
+.selector-card__desc {
+    font-size: 0.8rem;
+    color: var(--txt-secondary);
+    line-height: 1.5;
+    max-width: 240px;
+    opacity: 0;
+    max-height: 0;
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+    overflow: hidden;
+}
+
+.selector-card__cta {
+    margin-top: 6px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    color: var(--bg);
+    background: var(--cyan);
+    padding: 10px 28px;
+    border-radius: 100px;
+    box-shadow: 0 0 20px rgba(0,212,255,0.35);
+    transition: all 0.25s ease;
+}
+.selector-card--horario .selector-card__cta {
+    background: var(--magenta);
+    box-shadow: 0 0 20px rgba(255,45,155,0.35);
+}
+
+/* ---- Hover / focus state: grow, glow, reveal description ---- */
+.selector-card:hover,
+.selector-card:focus-visible {
+    transform: translateY(-10px) scale(1.045);
+    border-color: rgba(0,212,255,0.55);
+    box-shadow: 0 30px 70px rgba(0,212,255,0.18), 0 0 0 1px rgba(0,212,255,0.25);
+    z-index: 2;
+}
+.selector-card--horario:hover,
+.selector-card--horario:focus-visible {
+    border-color: rgba(255,45,155,0.55);
+    box-shadow: 0 30px 70px rgba(255,45,155,0.18), 0 0 0 1px rgba(255,45,155,0.25);
+}
+.selector-card:hover .selector-card__glow { opacity: 0.4; transform: translateX(-50%) scale(1.15); }
+.selector-card:hover .selector-card__icon { transform: scale(1.12) translateY(-4px); }
+.selector-card:hover .selector-card__desc {
+    opacity: 1;
+    max-height: 80px;
+    margin-top: 2px;
+}
+.selector-card:hover .selector-card__cta { transform: scale(1.05); }
+
+/* Dim the non-hovered sibling when one is hovered, Fortnite-style focus */
+.selector-cards:hover .selector-card:not(:hover) {
+    transform: scale(0.94);
+    opacity: 0.55;
+    filter: saturate(0.7);
+}
+
+@media (max-width: 720px) {
+    .selector-cards { flex-direction: column; align-items: center; }
+    .selector-card { width: 100%; max-width: 340px; height: 340px; }
+    .selector-card__icon { font-size: 3.6rem; margin-top: 40px; }
+    .selector-cards:hover .selector-card:not(:hover) { transform: none; opacity: 1; filter: none; }
+}
+
+/* ============================================================
+   NAV LINKS BETWEEN PAGES (used in faltas.html / horario.html header)
+   ============================================================ */
+.page-nav {
+    display: flex;
+    gap: 8px;
+}
+.page-nav a {
+    text-decoration: none;
+}

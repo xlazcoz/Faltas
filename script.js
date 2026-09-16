@@ -1,149 +1,14 @@
 /**
  * Control de Asistencia — CIFP USURBIL
- * Módulos: Config → Auth → DB → State → UI → Modals → Toast → Actions → Events → Init
+ * Usa shared.js para: CONFIG, tipoDia, horasLectivasRestantes, asignaturasDelDia,
+ * Auth, Offline, DB, Toast, setDbStatus
+ * Este archivo: State → UI → Modals → Actions → Events → Init (específico de esta página)
  */
 
-/* ============================================================
-   1. CONFIGURACIÓN
-   ============================================================ */
-const CONFIG = {
-    asignaturas: {
-        "Mar":    { nombre: "Markatze Lengoaiak (Mar)",  eval: { 1: 46,  2: 38, 3: 26 } },
-        "Gar":    { nombre: "Garapena (Gar)",            eval: { 1: 34,  2: 29, 3: 19 } },
-        "BBDD":   { nombre: "Datu-baseak (BBDD)",        eval: { 1: 66,  2: 56, 3: 42 } },
-        "Prog":   { nombre: "Programazioa (Prog)",       eval: { 1: 90,  2: 78, 3: 52 } },
-        "Ingles": { nombre: "Ingeles Teknikoa (Ingles)", eval: { 1: 24,  2: 22, 3: 12 } },
-        "Digi":   { nombre: "Digitalizazioa (Digi)",     eval: { 1: 24,  2: 22, 3: 10 } },
-        "Irau":   { nombre: "Iraunkortasuna (Irau)",     eval: { 1: 12,  2: 11, 3:  5 } }
-    },
-    limitePct: 20,
-    colors: {
-        "Mar":    "#00d4ff",
-        "Gar":    "#39ff6e",
-        "BBDD":   "#ffb830",
-        "Prog":   "#ff2d9b",
-        "Ingles": "#b794f4",
-        "Digi":   "#ff6b35",
-        "Irau":   "#00ffcc"
-    },
-
-    // Fechas de fin de cada evaluación
-    evalFin: {
-        1: '2025-11-21',
-        2: '2026-03-06',
-        3: '2026-06-05'
-    },
-
-    // Semanas de examen completas (no cuentan)
-    semanasExamen: [
-        { start: '2025-11-17', end: '2025-11-21', label: 'Fin 1ª Evaluación' },
-        { start: '2026-03-02', end: '2026-03-06', label: 'Fin 2ª Evaluación' },
-        { start: '2026-06-01', end: '2026-06-05', label: 'Fin 3ª Evaluación' },
-    ],
-
-    // Días festivos individuales y rangos
-    festivos: (() => {
-        const dias = [];
-        const rango = (inicio, fin) => {
-            const d = new Date(inicio + 'T00:00:00');
-            const f = new Date(fin   + 'T00:00:00');
-            while (d <= f) {
-                const y  = d.getFullYear();
-                const m  = String(d.getMonth() + 1).padStart(2, '0');
-                const dd = String(d.getDate()).padStart(2, '0');
-                dias.push(`${y}-${m}-${dd}`);
-                d.setDate(d.getDate() + 1);
-            }
-        };
-        rango('2025-12-08', '2025-12-08'); // Inmaculada Concepción
-        rango('2025-12-20', '2026-01-06'); // Navidades (desde el 20 dic) + Reyes (6 ene)
-        rango('2026-01-19', '2026-01-20'); // Tamborrada San Sebastián (19) + festivo (20)
-        rango('2026-02-16', '2026-02-22'); // Carnaval
-        rango('2026-03-19', '2026-03-20'); // Día del Padre (19) + puente (20)
-        rango('2026-03-30', '2026-04-12'); // Semana Santa
-        rango('2026-05-01', '2026-05-01'); // Día del Trabajo
-        return dias;
-    })(),
-
-    // Prácticas de empresa (no cuentan en Eval 3)
-    practicas: { start: '2026-05-04', end: '2026-05-25', label: 'Prácticas en empresa' },
-
-    // Horas por asignatura cada día de la semana (1=Lunes…5=Viernes)
-    horasDiarias: {
-        1: { Mar: 2, Prog: 2, BBDD: 2 },
-        2: { Gar: 2, BBDD: 2, Prog: 2 },
-        3: { BBDD: 2, Prog: 2 },
-        4: { Mar: 2, Ingles: 2 },
-        5: { Gar: 1, Prog: 2, Digi: 2, Irau: 1 }
-    }
-};
-
-/* ============================================================
-   HELPERS DE CALENDARIO
-   ============================================================ */
-
-/** Devuelve info sobre qué tipo de día especial es (o null si lectivo normal) */
-function tipoDia(dateStr) {
-    const d   = new Date(dateStr + 'T00:00:00');
-    const dow = d.getDay(); // 0=dom, 6=sab
-
-    if (dow === 0 || dow === 6) return { tipo: 'finde', label: 'Fin de semana' };
-
-    for (const s of CONFIG.semanasExamen) {
-        if (dateStr >= s.start && dateStr <= s.end) return { tipo: 'examen', label: s.label };
-    }
-    if (dateStr >= CONFIG.practicas.start && dateStr <= CONFIG.practicas.end) {
-        return { tipo: 'practica', label: CONFIG.practicas.label };
-    }
-    if (CONFIG.festivos.includes(dateStr)) return { tipo: 'festivo', label: 'Festivo / No lectivo' };
-
-    return null; // día lectivo normal
-}
-
-/** Horas de una asignatura que quedan desde hoy hasta el fin de la evaluación dada */
-function horasLectivasRestantes(key, evalNum) {
-    const finStr = CONFIG.evalFin[evalNum];
-    if (!finStr) return 0;
-    const fin   = new Date(finStr   + 'T00:00:00');
-    const hoy   = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    if (hoy > fin) return 0;
-
-    let total = 0;
-    const cur = new Date(hoy);
-    while (cur <= fin) {
-        const y  = cur.getFullYear();
-        const m  = String(cur.getMonth() + 1).padStart(2, '0');
-        const dd = String(cur.getDate()).padStart(2, '0');
-        const ds = `${y}-${m}-${dd}`;
-        const td  = tipoDia(ds);
-        if (!td) {
-            const dow = cur.getDay();
-            total += (CONFIG.horasDiarias[dow]?.[key] || 0);
-        }
-        cur.setDate(cur.getDate() + 1);
-    }
-    return total;
-}
-
-/** Lista de asignaturas que tienen clase en un día de la semana (Date) */
-function asignaturasDelDia(date) {
-    const dow = date.getDay();
-    return Object.keys(CONFIG.horasDiarias[dow] || {});
-}
-
-/* ============================================================
-   OFFLINE CACHE
-   ============================================================ */
-const Offline = {
-    KEY: 'ca_faltas_cache',
-    save(faltas) {
-        try { localStorage.setItem(this.KEY, JSON.stringify(faltas)); } catch(e) {}
-    },
-    load() {
-        try { const d = localStorage.getItem(this.KEY); return d ? JSON.parse(d) : []; }
-        catch(e) { return []; }
-    }
+// Alias de compatibilidad: Offline con clave fija para faltas
+const OfflineFaltas = {
+    save(faltas) { Offline.save('ca_faltas_cache', faltas); },
+    load()       { return Offline.load('ca_faltas_cache') || []; }
 };
 
 /* ============================================================
@@ -271,15 +136,13 @@ const Dashboard = {
         const nd  = String(now.getDate()).padStart(2, '0');
         const hoyStr = `${ny}-${nm}-${nd}`;
 
-        let dashEval = 1;
-        if (hoyStr >= '2025-11-24' && hoyStr <= '2026-03-06') dashEval = 2;
-        else if (hoyStr >= '2026-03-09') dashEval = 3;
+        const dashEval = evalForDate(hoyStr);
 
         // Calculate stats for a subject using dashEval directly (no State mutation)
         const calcDashStats = (key) => {
             const asig   = CONFIG.asignaturas[key];
             const totalH = dashEval === 'total'
-                ? asig.eval[1] + asig.eval[2] + asig.eval[3]
+                ? asig.eval[1] + asig.eval[2]
                 : asig.eval[dashEval];
             const lista  = State.faltas.filter(f =>
                 f.asignatura === key && Number(f.evaluacion) === dashEval
@@ -492,7 +355,6 @@ const Shortcuts = {
                 case 'n': case 'N': e.preventDefault(); Modals.registro.open(); break;
                 case '1': Actions.cambiarEvaluacion(1); break;
                 case '2': Actions.cambiarEvaluacion(2); break;
-                case '3': Actions.cambiarEvaluacion(3); break;
                 case 'g': case 'G': if (!e.shiftKey) Actions.cambiarEvaluacion('total'); break;
                 case 'r': case 'R': UI.switchTab('resumen'); break;
                 case 'p': case 'P': UI.switchTab('grafico'); break;
@@ -508,97 +370,50 @@ const Shortcuts = {
     }
 };
 
-const Auth = {
-    KEY: 'ca_auth_v1',
-    isLoggedIn() { return sessionStorage.getItem(this.KEY) === 'ok'; },
-    login(user, pass) {
-        if (user === 'admin' && pass === 'admin') {
-            sessionStorage.setItem(this.KEY, 'ok');
-            return true;
-        }
-        return false;
-    },
-    logout() { sessionStorage.removeItem(this.KEY); location.reload(); }
-};
-
 /* ============================================================
-   3. BASE DE DATOS
+   CONEXIÓN FIREBASE (usa DB/Auth/Offline de shared.js)
    ============================================================ */
-const DB = {
-    instance: null,
-    get credentials() {
-        return {
-            apiKey:    localStorage.getItem('firebase_apiKey'),
-            projectId: localStorage.getItem('firebase_projectId')
-        };
-    },
-    init() {
-        const { apiKey, projectId } = this.credentials;
-        if (!apiKey || !projectId) {
-            const cached = Offline.load();
+function initFirebaseFaltas() {
+    DB.init(
+        // onReady
+        () => {
+            setDbStatus('Conectando…', 'connecting');
+            DB.faltas.listen(
+                data => {
+                    State.faltas = data;
+                    OfflineFaltas.save(State.faltas);
+                    setDbStatus('Conectado', 'connected');
+                    UI.render();
+                },
+                err => {
+                    const cached = OfflineFaltas.load();
+                    if (cached.length > 0) {
+                        State.faltas = cached;
+                        setDbStatus('Offline (caché)', 'connecting');
+                        Toast.show('Sin conexión — mostrando datos guardados', 'info');
+                        UI.render();
+                    } else {
+                        setDbStatus('Error', 'error');
+                        Toast.show('Error al conectar con Firestore', 'error');
+                    }
+                }
+            );
+        },
+        // onMissing
+        () => {
+            const cached = OfflineFaltas.load();
             if (cached.length > 0) {
                 State.faltas = cached;
-                UI.setStatus('Offline (sin config)', 'connecting');
+                setDbStatus('Offline (sin config)', 'connecting');
                 Toast.show('Firebase sin configurar — mostrando caché local', 'info');
                 UI.render();
             } else {
-                UI.setStatus('Sin configurar', 'error');
+                setDbStatus('Sin configurar', 'error');
                 Modals.firebase.open();
             }
-            return;
         }
-        try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp({ apiKey, projectId, authDomain: `${projectId}.firebaseapp.com` });
-            }
-            this.instance = firebase.firestore();
-            this.listen();
-        } catch(e) { console.error(e); UI.setStatus('Error de conexión', 'error'); }
-    },
-    listen() {
-        UI.setStatus('Conectando…', 'connecting');
-        this.instance.collection('faltas').onSnapshot(
-            snap => {
-                State.faltas = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                Offline.save(State.faltas);
-                UI.setStatus('Conectado', 'connected');
-                UI.render();
-            },
-            err => {
-                console.error(err);
-                const cached = Offline.load();
-                if (cached.length > 0) {
-                    State.faltas = cached;
-                    UI.setStatus('Offline (caché)', 'connecting');
-                    Toast.show('Sin conexión — mostrando datos guardados', 'info');
-                    UI.render();
-                } else {
-                    UI.setStatus('Error', 'error');
-                    Toast.show('Error al conectar con Firestore', 'error');
-                }
-            }
-        );
-    },
-    async add(data) {
-        if (!this.instance) return Toast.show('Sin conexión a BD', 'error');
-        await this.instance.collection('faltas').add({ ...data, timestamp: new Date().toISOString() });
-    },
-    async update(id, data) {
-        if (!this.instance) return Toast.show('Sin conexión a BD', 'error');
-        await this.instance.collection('faltas').doc(id).update(data);
-    },
-    async delete(id) {
-        if (!this.instance) return Toast.show('Sin conexión a BD', 'error');
-        await this.instance.collection('faltas').doc(id).delete();
-    },
-    async deleteAll() {
-        if (!this.instance) return Toast.show('Sin conexión a BD', 'error');
-        const snap = await this.instance.collection('faltas').get();
-        const batch = this.instance.batch();
-        snap.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-    }
-};
+    );
+}
 
 /* ============================================================
    4. ESTADO
@@ -617,7 +432,7 @@ const State = {
         let totalH, lista;
 
         if (this.evaluacion === 'total') {
-            totalH = asig.eval[1] + asig.eval[2] + asig.eval[3];
+            totalH = asig.eval[1] + asig.eval[2];
             lista = this.faltas.filter(f => f.asignatura === key);
         } else {
             totalH = asig.eval[this.evaluacion];
@@ -953,7 +768,7 @@ const UI = {
             if (td) {
                 if (td.tipo === 'finde')    { extraClass = 'cal-day--finde';    clickable = false; }
                 if (td.tipo === 'festivo')  { extraClass = 'cal-day--festivo';  tooltip = td.label; clickable = false; }
-                if (td.tipo === 'examen')   { extraClass = 'cal-day--examen';   tooltip = td.label; clickable = false; }
+                if (td.tipo === 'examen')   { extraClass = 'cal-day--examen';   tooltip = td.label; /* sigue siendo lectivo */ }
                 if (td.tipo === 'practica') { extraClass = 'cal-day--practica'; tooltip = td.label; clickable = hasFaltas; }
             }
 
@@ -963,23 +778,25 @@ const UI = {
             }).join('');
 
             const dayOfWeek    = new Date(year, month, day).getDay();
-            const isLectivo    = !td && dayOfWeek >= 1 && dayOfWeek <= 5;
-            const titleAttr    = isLectivo ? `title="Click: ver faltas · Doble click: añadir falta"` : (tooltip ? `title="${tooltip}"` : '');
+            // Un día es lectivo si no hay tipoDia, o si es examen (que sigue contando)
+            const esBloqueante = td && td.bloqueante;
+            const isLectivo    = !esBloqueante && dayOfWeek >= 1 && dayOfWeek <= 5;
+            const titleAttr    = tooltip ? `title="${tooltip}${td && !td.bloqueante ? ' — sigue contando como lectivo' : ''}"` : (isLectivo ? `title="Click: ver faltas · Doble click: añadir falta"` : '');
             const onclickAttr  = (clickable || hasFaltas) ? `onclick="Actions.showCalDay(${day}, ${year}, ${month})"` : '';
             const dblclickAttr = isLectivo ? `ondblclick="Actions.showDaySchedule(${day}, ${year}, ${month})"` : '';
-            const lectivoclickAttr = '';
 
             html += `
             <div class="cal-day${isToday ? ' cal-day--today' : ''}${hasFaltas ? ' cal-day--has-faltas' : ''}${isLectivo ? ' cal-day--lectivo' : ''} ${extraClass}"
                  ${titleAttr} ${onclickAttr} ${dblclickAttr}>
                 <span class="cal-day__num">${day}</span>
-                ${td && td.tipo !== 'finde' && !hasFaltas
-                    ? `<span class="cal-day__label">${
-                        td.tipo === 'festivo'  ? '✕' :
-                        td.tipo === 'examen'   ? '📝' :
-                        td.tipo === 'practica' ? '🏢' : ''
-                      }</span>`
-                    : `<div class="cal-day__dots">${dots}</div>`
+                ${td && td.tipo === 'examen'
+                    ? `<span class="cal-day__label" style="opacity:0.6">📝</span><div class="cal-day__dots">${dots}</div>`
+                    : td && td.tipo !== 'finde' && !hasFaltas
+                        ? `<span class="cal-day__label">${
+                            td.tipo === 'festivo'  ? '✕' :
+                            td.tipo === 'practica' ? '🏢' : ''
+                          }</span>`
+                        : `<div class="cal-day__dots">${dots}</div>`
                 }
                 ${isLectivo ? `<span class="cal-day__hint">+</span>` : ''}
             </div>`;
@@ -1078,28 +895,7 @@ const Modals = {
 };
 
 /* ============================================================
-   7. TOASTS
-   ============================================================ */
-const Toast = {
-    show(msg, type = 'info', duration = 3200) {
-        const container = document.getElementById('toast-container');
-        const el = document.createElement('div');
-        el.className = `toast toast--${type}`;
-        el.textContent = msg;
-        el.addEventListener('click', () => el.remove());
-        container.appendChild(el);
-        setTimeout(() => {
-            el.style.animation = 'none';
-            el.style.opacity = '0';
-            el.style.transform = 'translateX(22px)';
-            el.style.transition = 'all 0.25s ease';
-            setTimeout(() => el.remove(), 260);
-        }, duration);
-    }
-};
-
-/* ============================================================
-   8. ACCIONES
+   7. ACCIONES  (Toast ahora viene de shared.js)
    ============================================================ */
 const Actions = {
     async registrarFalta() {
@@ -1117,7 +913,7 @@ const Actions = {
         const statsBefore = State.calcStats(asignatura);
 
         try {
-            await DB.add({ asignatura, fecha, horas, evaluacion, tipo, nota });
+            await DB.faltas.add({ asignatura, fecha, horas, evaluacion, tipo, nota });
             Modals.registro.close();
             document.getElementById('asignatura').value = '';
             document.getElementById('nota').value = '';
@@ -1140,7 +936,7 @@ const Actions = {
         const falta = State.faltas.find(f => f.id === id);
         if (falta) Trash.add(falta);
         try {
-            await DB.delete(id);
+            await DB.faltas.delete(id);
             Toast.show('Movida a la papelera — puedes recuperarla con T', 'info', 4000);
         } catch(e) { Toast.show('Error al eliminar', 'error'); }
     },
@@ -1150,7 +946,7 @@ const Actions = {
         if (!falta) return Toast.show('No encontrada en papelera', 'error');
         try {
             const { id: _id, deletedAt, ...data } = falta;
-            await DB.add(data);
+            await DB.faltas.add(data);
             Trash.remove(id);
             Trash.render();
             Toast.show('Falta restaurada', 'success');
@@ -1180,7 +976,7 @@ const Actions = {
 
         if (!fecha || !asignatura || isNaN(horas)) return Toast.show('Rellena todos los campos', 'error');
         try {
-            await DB.update(id, { evaluacion, fecha, asignatura, horas, tipo, nota });
+            await DB.faltas.update(id, { evaluacion, fecha, asignatura, horas, tipo, nota });
             Modals.edit.close();
             Toast.show('Falta actualizada', 'success');
             // Si el calendario está activo, refrescar el detalle del día visible
@@ -1193,7 +989,7 @@ const Actions = {
     async limpiarBD() {
         const ok = await Modals.confirm.open('⚠ Limpiar base de datos', 'Se eliminarán TODAS las faltas de todas las evaluaciones. Irreversible.');
         if (!ok) return;
-        try { await DB.deleteAll(); Toast.show('Base de datos limpiada', 'info'); }
+        try { await DB.faltas.deleteAll(); Toast.show('Base de datos limpiada', 'info'); }
         catch(e) { Toast.show('Error al limpiar', 'error'); }
     },
 
@@ -1222,7 +1018,7 @@ const Actions = {
                 for (const f of faltas) {
                     if (!f.asignatura || !f.fecha || !f.horas) { errores++; continue; }
                     try {
-                        await DB.add({ asignatura: f.asignatura, fecha: f.fecha, horas: f.horas, evaluacion: f.evaluacion || 1, tipo: f.tipo || 'injustificada', nota: f.nota || '' });
+                        await DB.faltas.add({ asignatura: f.asignatura, fecha: f.fecha, horas: f.horas, evaluacion: f.evaluacion || 1, tipo: f.tipo || 'injustificada', nota: f.nota || '' });
                     } catch { errores++; }
                 }
                 Toast.show(`Importadas ${faltas.length - errores} faltas${errores ? ` (${errores} errores)` : ''}`, 'success');
@@ -1286,9 +1082,7 @@ const Actions = {
         }
 
         // Detect eval for this date
-        let evalNum = 1;
-        if (dateStr >= '2025-11-24' && dateStr <= '2026-03-06') evalNum = 2;
-        else if (dateStr >= '2026-03-09') evalNum = 3;
+        const evalNum = evalForDate(dateStr);
 
         const scheduleRows = keys.map(key => {
             const color   = CONFIG.colors[key] || '#64748b';
@@ -1369,7 +1163,7 @@ const Actions = {
         let registradas = 0;
         for (const key of keys) {
             try {
-                await DB.add({ asignatura: key, fecha: dateStr, horas: sched[key], evaluacion: evalNum, tipo: 'injustificada', nota: '' });
+                await DB.faltas.add({ asignatura: key, fecha: dateStr, horas: sched[key], evaluacion: evalNum, tipo: 'injustificada', nota: '' });
                 registradas++;
             } catch(e) { console.error(e); }
         }
@@ -1627,9 +1421,7 @@ function initEvents() {
 
         // Autodetectar evaluación según fecha
         const dateStr = e.target.value;
-        let evalSugerida = 1;
-        if (dateStr >= '2025-11-24' && dateStr <= '2026-03-06') evalSugerida = 2;
-        else if (dateStr >= '2026-03-09') evalSugerida = 3;
+        const evalSugerida = evalForDate(dateStr);
         document.getElementById('evaluacion-input').value = evalSugerida;
     });
 
@@ -1654,7 +1446,7 @@ function initEvents() {
     document.getElementById('btn-compact')?.addEventListener('click', () => CompactView.toggle());
 
     // Logout
-    document.getElementById('btn-logout').addEventListener('click', () => Auth.logout());
+    // Logout eliminado — la app ya no requiere login
 
     // Firebase modal
     document.getElementById('btn-settings').addEventListener('click',   () => Modals.firebase.open());
@@ -1698,8 +1490,18 @@ function initEvents() {
 }
 
 /* ============================================================
-   10. LOGIN
+   10. UTILIDAD
    ============================================================ */
+function populateAsigSelects() {
+    document.querySelectorAll('select.asig-select').forEach(sel => {
+        const hasPlaceholder = sel.querySelector('option[value=""]');
+        const placeholderHTML = hasPlaceholder ? hasPlaceholder.outerHTML : '';
+        const optionsHTML = Object.entries(CONFIG.asignaturas)
+            .map(([key, asig]) => `<option value="${key}">${asig.nombre}</option>`)
+            .join('');
+        sel.innerHTML = placeholderHTML + optionsHTML;
+    });
+}
 
 function autoSetEval() {
     const today = new Date();
@@ -1708,48 +1510,7 @@ function autoSetEval() {
     const d = String(today.getDate()).padStart(2, '0');
     const ds = `${y}-${m}-${d}`;
 
-    let eval_ = 1;
-    if (ds >= '2025-11-24' && ds <= '2026-03-06') eval_ = 2;
-    else if (ds >= '2026-03-09') eval_ = 3;
-
-    State.evaluacion = eval_;
-}
-function initLogin() {
-    const doLogin = () => {
-        const user    = document.getElementById('login-user').value.trim();
-        const pass    = document.getElementById('login-pass').value;
-        const errorEl = document.getElementById('login-error');
-
-        if (Auth.login(user, pass)) {
-            errorEl.style.display = 'none';
-            const screen = document.getElementById('login-screen');
-            const app    = document.getElementById('app');
-
-            screen.style.transition = 'opacity 0.4s ease';
-            screen.style.opacity = '0';
-
-            setTimeout(() => {
-                screen.style.display = 'none';
-                app.style.display = 'block';
-                app.style.opacity = '0';
-                app.style.transition = 'opacity 0.4s ease';
-                requestAnimationFrame(() => { app.style.opacity = '1'; });
-
-                autoSetEval();
-                initEvents();
-                UI.render();
-                DB.init();
-            }, 400);
-        } else {
-            errorEl.style.display = 'block';
-            document.getElementById('login-pass').value = '';
-            document.getElementById('login-pass').focus();
-        }
-    };
-
-    document.getElementById('btn-login').addEventListener('click', doLogin);
-    document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-    document.getElementById('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
+    State.evaluacion = evalForDate(ds);
 }
 
 /* ============================================================
@@ -1768,14 +1529,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Init keyboard shortcuts
     Shortcuts.init();
 
-    if (Auth.isLoggedIn()) {
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        autoSetEval();
-        initEvents();
-        UI.render();
-        DB.init();
-    } else {
-        initLogin();
-    }
+    autoSetEval();
+    populateAsigSelects();
+    initEvents();
+    UI.render();
+    initFirebaseFaltas();
 });

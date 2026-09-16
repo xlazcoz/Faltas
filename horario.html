@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#00d4ff">
+    <title>Horario — CIFP USURBIL</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="horario.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div id="app">
+    <div class="bg-grid"></div>
+    <div class="container">
+
+        <!-- HEADER -->
+        <header class="site-header">
+            <div class="header-left">
+                <div class="logo-mark">CA</div>
+                <div>
+                    <h1>Horario Semanal</h1>
+                    <p>CIFP USURBIL · 2DDAW · Curso 26-27</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="db-badge">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Conectando…</span>
+                </div>
+                <nav class="page-nav">
+                    <a href="index.html" class="btn-icon" title="Inicio">🏠</a>
+                    <a href="faltas.html" class="btn-icon" title="Control de Faltas">📋</a>
+                </nav>
+                <button class="btn-ghost btn-sm" id="btn-print" title="Modo impresión">🖨 Imprimir</button>
+            </div>
+        </header>
+
+        <!-- WIDGET: AHORA / PRÓXIMA CLASE -->
+        <div id="now-widget" class="now-widget"></div>
+
+        <!-- HINT BAR -->
+        <div class="hint-bar">
+            <span>💡 Click en una asignatura para resaltarla · click de nuevo para deseleccionar</span>
+        </div>
+
+        <!-- SCHEDULE GRID (desktop) -->
+        <div class="panel schedule-panel" id="schedule-panel">
+            <div class="panel-inner">
+                <div id="schedule-grid" class="schedule-grid"></div>
+            </div>
+        </div>
+
+        <!-- MOBILE LIST VIEW -->
+        <div class="panel schedule-panel-mobile" id="schedule-panel-mobile">
+            <div class="panel-inner">
+                <div id="mobile-list" class="mobile-list"></div>
+            </div>
+        </div>
+
+        <!-- LEYENDA + HORAS SEMANALES -->
+        <div class="panel legend-panel">
+            <div class="panel-inner">
+                <h2 class="panel__title" style="margin-bottom:14px">Horas semanales por asignatura</h2>
+                <div id="legend-list" class="legend-list"></div>
+            </div>
+        </div>
+
+        <!-- INFO PANEL (aparece al seleccionar asignatura) -->
+        <div id="info-panel" class="panel info-panel" style="display:none">
+            <div class="panel-inner">
+                <div id="info-content"></div>
+            </div>
+        </div>
+
+        <!-- Sin selección -->
+        <div id="empty-hint" class="empty-hint">
+            <span style="font-size:2.4rem;opacity:0.3">👆</span>
+            <p>Selecciona una asignatura del horario para ver sus datos, apuntes y registrar faltas</p>
+        </div>
+
+    </div>
+</div>
+
+<!-- Registrar falta (reutilizado) -->
+<div id="register-modal" class="modal">
+    <div class="modal-backdrop" id="register-backdrop"></div>
+    <div class="modal-card">
+        <div class="modal-card__header">
+            <h3>📝 Registrar falta</h3>
+            <button class="modal-close" id="register-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <div class="form-grid">
+                <div class="field">
+                    <label for="evaluacion-input">Evaluación</label>
+                    <select id="evaluacion-input">
+                        <option value="1">1ª Evaluación</option>
+                        <option value="2">2ª Evaluación</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="fecha">Fecha</label>
+                    <input type="date" id="fecha" required>
+                </div>
+                <div class="field">
+                    <label for="asignatura">Asignatura</label>
+                    <select id="asignatura" class="asig-select" required>
+                        <option value="">— Seleccionar —</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="horas">Horas</label>
+                    <input type="number" id="horas" min="1" max="8" value="2" required>
+                </div>
+                <div class="field">
+                    <label for="tipo">Tipo</label>
+                    <select id="tipo">
+                        <option value="injustificada">Injustificada</option>
+                        <option value="justificada">Justificada</option>
+                    </select>
+                </div>
+                <div class="field field--full">
+                    <label for="nota">Nota (opcional)</label>
+                    <input type="text" id="nota" placeholder="Ej: médico, excursión, examen…" maxlength="100">
+                </div>
+            </div>
+            <button id="btn-registrar" class="btn-primary btn-full" style="margin-top:8px;">Registrar falta</button>
+        </div>
+    </div>
+</div>
+
+<div id="confirm-modal" class="modal">
+    <div class="modal-backdrop" id="confirm-backdrop"></div>
+    <div class="modal-card modal-card--sm">
+        <div class="modal-card__header">
+            <h3 id="confirm-title">¿Confirmar?</h3>
+        </div>
+        <div class="modal-card__body">
+            <p id="confirm-message" style="color:var(--txt-secondary);font-size:0.9rem;"></p>
+            <div class="confirm-buttons">
+                <button id="confirm-cancel" class="btn-ghost">Cancelar</button>
+                <button id="confirm-ok" class="btn-danger">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container" aria-live="polite"></div>
+
+<script src="shared.js"></script>
+<script src="horario.js"></script>
+</body>
+</html>

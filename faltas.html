@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#00d4ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Control de Asistencia — CIFP USURBIL</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div id="app">
+    <div class="bg-grid"></div>
+    <div class="container">
+
+        <!-- HEADER -->
+        <header class="site-header">
+            <div class="header-left">
+                <div class="logo-mark">CA</div>
+                <div>
+                    <h1>Control de Asistencia</h1>
+                    <p>CIFP USURBIL · 1DDAW3 Web Aplikazioen Garapena</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="db-badge">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Conectando…</span>
+                </div>
+                <nav class="page-nav">
+                    <a href="index.html" class="btn-icon" title="Inicio">🏠</a>
+                    <a href="horario.html" class="btn-icon" title="Horario">📅</a>
+                </nav>
+                <button class="btn-icon" id="btn-trash" title="Papelera (T)">🗑
+                    <span class="trash-badge" id="trash-count" style="display:none">0</span>
+                </button>
+                <button class="btn-icon" id="btn-shortcuts" title="Atajos de teclado (?)">⌨</button>
+                <button class="btn-icon" id="btn-settings" title="Configuración Firebase">⚙</button>
+            </div>
+        </header>
+
+        <!-- TOP STRIP -->
+        <div class="top-strip">
+            <nav class="eval-nav">
+                <button class="eval-tab active" data-eval="1">1ª Eval</button>
+                <button class="eval-tab" data-eval="2">2ª Eval</button>
+                <button class="eval-tab eval-tab--global" data-eval="total">🌍 Global</button>
+            </nav>
+            <div class="top-right">
+                <div class="stats-strip">
+                    <div class="stat-pill">
+                        <span class="stat-pill__label">Horas totales</span>
+                        <span class="stat-pill__val" id="total-horas">—</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="stat-pill__label">Faltadas</span>
+                        <span class="stat-pill__val" id="total-faltas">—</span>
+                    </div>
+                    <div class="stat-pill stat-pill--alert" id="riesgo-pill">
+                        <span class="stat-pill__label">En riesgo</span>
+                        <span class="stat-pill__val" id="asignaturas-riesgo">—</span>
+                    </div>
+                </div>
+                <button id="btn-abrir-registro" class="btn-primary">+ Registrar falta</button>
+            </div>
+        </div>
+
+        <!-- CONTENT TABS -->
+        <div class="content-nav">
+            <button class="content-tab active" data-tab="resumen">📋 Resumen</button>
+            <button class="content-tab" data-tab="grafico">📈 Gráfico</button>
+            <button class="content-tab" data-tab="calendario">📅 Calendario</button>
+            <button class="content-tab" data-tab="calculadora">🔮 Calculadora</button>
+        </div>
+
+        <!-- TAB: RESUMEN -->
+        <div id="tab-resumen" class="tab-panel panel active">
+            <div class="panel-inner">
+
+                <div id="week-summary" class="week-summary"></div>
+
+                <div class="resumen-header">
+                    <h2 class="panel__title">Resumen de asistencia</h2>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                        <button id="btn-compact" class="btn-ghost btn-sm" title="Shift+C">⊟ Compactar</button>
+                        <div class="filter-group">
+                            <button class="btn-filter active" data-filter="all">Todas</button>
+                            <button class="btn-filter" data-filter="warning">⚠ Riesgo</button>
+                            <button class="btn-filter" data-filter="danger">🔴 Peligro</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="tabla-resumen" class="tabla-container"></div>
+
+                <div class="historial-section">
+                    <div class="historial-header">
+                        <h3>Historial <span class="historial-badge" id="historial-eval-label">Eval 1</span></h3>
+                        <div class="historial-actions">
+                            <button class="btn-ghost btn-sm" id="btn-exportar">↓ JSON</button>
+                            <button class="btn-ghost btn-sm" id="btn-importar">↑ JSON</button>
+                            <input type="file" id="file-importar" accept=".json" style="display:none">
+                            <button class="btn-danger-ghost btn-sm" id="btn-limpiar">🗑 Limpiar BD</button>
+                        </div>
+                    </div>
+                    <div id="lista-faltas-container" class="historial-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: GRÁFICO -->
+        <div id="tab-grafico" class="tab-panel panel">
+            <div class="panel-inner">
+                <h2 class="panel__title">Porcentaje de faltas por asignatura</h2>
+                <p class="panel__subtitle">Las líneas indican los umbrales de riesgo (10%) y peligro (20%)</p>
+                <div class="chart-container">
+                    <canvas id="chart-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: CALENDARIO -->
+        <div id="tab-calendario" class="tab-panel panel">
+            <div class="panel-inner">
+                <div class="cal-header">
+                    <button class="btn-ghost btn-sm" id="cal-prev">← Anterior</button>
+                    <h2 class="panel__title" id="cal-title">Enero 2026</h2>
+                    <button class="btn-ghost btn-sm" id="cal-next">Siguiente →</button>
+                </div>
+                <div class="cal-legend" id="cal-legend"></div>
+                <div id="cal-grid" class="cal-grid"></div>
+                <div id="cal-detail" class="cal-detail" style="display:none"></div>
+            </div>
+        </div>
+
+        <!-- TAB: CALCULADORA -->
+        <div id="tab-calculadora" class="tab-panel panel">
+            <div class="panel-inner">
+                <h2 class="panel__title">Calculadora predictiva</h2>
+                <p class="panel__subtitle">Simula qué estado tendría una asignatura si faltas más horas</p>
+                <div class="calc-form">
+                    <div class="field">
+                        <label for="calc-asignatura">Asignatura</label>
+                        <select id="calc-asignatura" class="asig-select">
+                            <option value="">— Seleccionar —</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="calc-horas">Horas a simular</label>
+                        <input type="number" id="calc-horas" min="1" max="30" value="2">
+                    </div>
+                    <button id="btn-simular" class="btn-primary">Simular</button>
+                </div>
+                <div id="calc-result" class="calc-result" style="display:none"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ===================== MODALS ===================== -->
+
+<div id="register-modal" class="modal">
+    <div class="modal-backdrop" id="register-backdrop"></div>
+    <div class="modal-card">
+        <div class="modal-card__header">
+            <h3>📝 Registrar falta</h3>
+            <button class="modal-close" id="register-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <div class="form-grid">
+                <div class="field">
+                    <label for="evaluacion-input">Evaluación</label>
+                    <select id="evaluacion-input">
+                        <option value="1">1ª Evaluación</option>
+                        <option value="2">2ª Evaluación</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="fecha">Fecha</label>
+                    <input type="date" id="fecha" required>
+                </div>
+                <div class="field">
+                    <label for="asignatura">Asignatura</label>
+                    <select id="asignatura" class="asig-select" required>
+                        <option value="">— Seleccionar —</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="horas">Horas</label>
+                    <input type="number" id="horas" min="1" max="8" value="2" required>
+                </div>
+                <div class="field">
+                    <label for="tipo">Tipo</label>
+                    <select id="tipo">
+                        <option value="injustificada">Injustificada</option>
+                        <option value="justificada">Justificada</option>
+                    </select>
+                </div>
+                <div class="field field--full">
+                    <label for="nota">Nota (opcional)</label>
+                    <input type="text" id="nota" placeholder="Ej: médico, excursión, examen…" maxlength="100">
+                </div>
+            </div>
+            <button id="btn-registrar" class="btn-primary btn-full" style="margin-top:8px;">Registrar falta</button>
+        </div>
+    </div>
+</div>
+
+<div id="edit-modal" class="modal">
+    <div class="modal-backdrop" id="edit-backdrop"></div>
+    <div class="modal-card">
+        <div class="modal-card__header">
+            <h3>✏️ Editar falta</h3>
+            <button class="modal-close" id="edit-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <input type="hidden" id="edit-id">
+            <div class="form-grid">
+                <div class="field">
+                    <label for="edit-evaluacion">Evaluación</label>
+                    <select id="edit-evaluacion">
+                        <option value="1">1ª Evaluación</option>
+                        <option value="2">2ª Evaluación</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="edit-fecha">Fecha</label>
+                    <input type="date" id="edit-fecha">
+                </div>
+                <div class="field">
+                    <label for="edit-asignatura">Asignatura</label>
+                    <select id="edit-asignatura" class="asig-select"></select>
+                </div>
+                <div class="field">
+                    <label for="edit-horas">Horas</label>
+                    <input type="number" id="edit-horas" min="1" max="8">
+                </div>
+                <div class="field">
+                    <label for="edit-tipo">Tipo</label>
+                    <select id="edit-tipo">
+                        <option value="injustificada">Injustificada</option>
+                        <option value="justificada">Justificada</option>
+                    </select>
+                </div>
+                <div class="field field--full">
+                    <label for="edit-nota">Nota (opcional)</label>
+                    <input type="text" id="edit-nota" maxlength="100">
+                </div>
+            </div>
+            <div class="confirm-buttons" style="margin-top:8px;">
+                <button id="edit-cancel" class="btn-ghost">Cancelar</button>
+                <button id="edit-save" class="btn-primary">Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="firebase-modal" class="modal">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-card">
+        <div class="modal-card__header">
+            <h3>🔧 Configuración Firebase</h3>
+            <button class="modal-close" id="modal-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <p class="modal-hint">Necesitas un proyecto de Firebase con Firestore habilitado.</p>
+            <div class="field">
+                <label for="api-key">API Key</label>
+                <input type="text" id="api-key" placeholder="AIzaSy…" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="project-id">Project ID</label>
+                <input type="text" id="project-id" placeholder="mi-proyecto-xxxxx" autocomplete="off">
+            </div>
+            <button id="btn-guardar-config" class="btn-primary btn-full" style="margin-top:4px;">Guardar y reconectar</button>
+            <details class="config-help">
+                <summary>¿Cómo obtengo estos datos?</summary>
+                <ol>
+                    <li>Ve a <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+                    <li>Crea o abre tu proyecto</li>
+                    <li>⚙ Configuración → Tu aplicación web</li>
+                    <li>Copia <code>apiKey</code> y <code>projectId</code></li>
+                    <li>Activa <strong>Firestore Database</strong> en modo prueba</li>
+                </ol>
+            </details>
+        </div>
+    </div>
+</div>
+
+<div id="confirm-modal" class="modal">
+    <div class="modal-backdrop" id="confirm-backdrop"></div>
+    <div class="modal-card modal-card--sm">
+        <div class="modal-card__header">
+            <h3 id="confirm-title">¿Confirmar?</h3>
+        </div>
+        <div class="modal-card__body">
+            <p id="confirm-message" style="color:var(--txt-secondary);font-size:0.9rem;"></p>
+            <div class="confirm-buttons">
+                <button id="confirm-cancel" class="btn-ghost">Cancelar</button>
+                <button id="confirm-ok" class="btn-danger">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="trash-modal" class="modal">
+    <div class="modal-backdrop" id="trash-backdrop"></div>
+    <div class="modal-card modal-card--lg">
+        <div class="modal-card__header">
+            <h3>🗑 Papelera</h3>
+            <button class="modal-close" id="trash-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <p class="modal-hint">Las faltas eliminadas se recuperan hasta 7 días después.</p>
+            <div id="trash-list" class="historial-grid" style="max-height:400px;overflow-y:auto"></div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px">
+                <button id="btn-trash-clear" class="btn-danger-ghost btn-sm">Vaciar papelera</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="shortcuts-modal" class="modal">
+    <div class="modal-backdrop" id="shortcuts-backdrop"></div>
+    <div class="modal-card modal-card--sm">
+        <div class="modal-card__header">
+            <h3>⌨ Atajos de teclado</h3>
+            <button class="modal-close" id="shortcuts-close">✕</button>
+        </div>
+        <div class="modal-card__body">
+            <div class="shortcuts-grid">
+                <div class="shortcut-row"><kbd>N</kbd><span>Nueva falta</span></div>
+                <div class="shortcut-row"><kbd>1</kbd><kbd>2</kbd><span>Cambiar evaluación</span></div>
+                <div class="shortcut-row"><kbd>G</kbd><span>Vista Global</span></div>
+                <div class="shortcut-row"><kbd>R</kbd><span>Pestaña Resumen</span></div>
+                <div class="shortcut-row"><kbd>P</kbd><span>Pestaña Gráfico</span></div>
+                <div class="shortcut-row"><kbd>C</kbd><span>Pestaña Calendario</span></div>
+                <div class="shortcut-row"><kbd>K</kbd><span>Pestaña Calculadora</span></div>
+                <div class="shortcut-row"><kbd>Shift</kbd><kbd>C</kbd><span>Vista compacta</span></div>
+                <div class="shortcut-row"><kbd>T</kbd><span>Papelera</span></div>
+                <div class="shortcut-row"><kbd>?</kbd><span>Esta ayuda</span></div>
+                <div class="shortcut-row"><kbd>Esc</kbd><span>Cerrar modal</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container" aria-live="polite"></div>
+
+<script src="shared.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
