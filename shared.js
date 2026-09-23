@@ -9,39 +9,40 @@
 // slot = índice de bloque de 30 min empezando en las 08:00 (slot 0 = 08:00-08:30)
 const HORARIO_BLOQUES = {
     1: [ // Lunes
-        { key: 'Zerb', start: 0,  span: 4 }, // 08:00-10:00
-        { key: 'Info', start: 4,  span: 2 }, // 10:00-11:00
+        { key: 'Zerb', start: 0, span: 4 }, // 08:00-10:00
+        { key: 'Info', start: 4, span: 2 }, // 10:00-11:00
         { key: '_desc', start: 6, span: 1 }, // 11:00-11:30
-        { key: 'Info', start: 7,  span: 2 }, // 11:30-12:30
-        { key: 'Py', start: 9,  span: 4 }, // 12:30-14:30
+        { key: 'Info', start: 7, span: 2 }, // 11:30-12:30
+        { key: 'Py',   start: 9, span: 4 }, // 12:30-14:30
     ],
     2: [ // Martes
-        { key: 'Info', start: 0, span: 2 }, // 08:00-09:00
+        { key: 'Info',  start: 0, span: 2 }, // 08:00-09:00
         { key: 'Bezer', start: 2, span: 4 }, // 09:00-11:00
         { key: '_desc', start: 6, span: 1 },
-        { key: 'WAH',   start: 7, span: 2 }, // 11:30-12:30
-        { key: '_libre', start: 9, span: 4 }, // 12:30-14:30
+        { key: 'WAH',    start: 7, span: 2 }, // 11:30-12:30
+        { key: '_libre', start: 9, span: 4 }, // 12:30-14:30 (Enpleagarritasun, no lectivo)
     ],
     3: [ // Miércoles
-        { key: 'WI',   start: 0, span: 2 }, // 08:00-09:00
+        { key: 'WI',    start: 0, span: 2 }, // 08:00-09:00
         { key: 'Bezer', start: 2, span: 4 }, // 09:00-11:00
         { key: '_desc', start: 6, span: 1 },
-        { key: 'Zerb', start: 7, span: 4 }, // 11:30-13:30
-        { key: '_libre', start: 11, span: 2 }, // 13:30-14:30
+        { key: 'Zerb',   start: 7, span: 4 }, // 11:30-13:30
+        { key: '_libre', start: 11, span: 2 }, // 13:30-14:30 (Enpleagarritasun, no lectivo)
     ],
     4: [ // Jueves
         { key: 'Zerb', start: 0, span: 4 }, // 08:00-10:00
         { key: 'WI',   start: 4, span: 2 }, // 10:00-11:00
         { key: '_desc', start: 6, span: 1 },
         { key: 'Zerb', start: 7, span: 2 }, // 11:30-12:30
-        { key: 'Py', start: 9, span: 4 }, // 12:30-14:30
+        { key: 'Py',   start: 9, span: 4 }, // 12:30-14:30
     ],
     5: [ // Viernes
         { key: 'WI',   start: 0, span: 4 }, // 08:00-10:00
         { key: 'Info', start: 4, span: 2 }, // 10:00-11:00
         { key: '_desc', start: 6, span: 1 },
-        { key: 'Info', start: 7, span: 2 }, // 11:30-12:30
-        { key: 'WAH',  start: 9, span: 4 }, // 12:30-14:30
+        { key: 'WAH',  start: 7, span: 2 }, // 11:30-12:30
+        { key: 'Info', start: 9, span: 2 }, // 12:30-13:30
+        { key: 'WAH',  start: 11, span: 2 }, // 13:30-14:30
     ],
 };
 
