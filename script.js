@@ -114,6 +114,13 @@ const WeekSummary = {
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
 
+        // Detectar erronka activa en la semana (según el lunes de esta semana)
+        const wy = weekStart.getFullYear();
+        const wm = String(weekStart.getMonth() + 1).padStart(2, '0');
+        const wd = String(weekStart.getDate()).padStart(2, '0');
+        const weekStartStr = `${wy}-${wm}-${wd}`;
+        const erronkaSemana = erronkaForDate(weekStartStr);
+
         // Total lectivo hours this week
         const horasSemanales = [1,2,3,4,5].reduce((total, d) => {
             return total + Object.values(CONFIG.horasDiarias[d] || {}).reduce((s, h) => s + h, 0);
@@ -171,7 +178,10 @@ const WeekSummary = {
 
         container.innerHTML = `
             <div class="week-summary-inner">
-                <div class="week-label">Esta semana</div>
+                <div class="week-label">
+                    Esta semana
+                    ${erronkaSemana ? `<span class="week-erronka-badge" title="Erronka activa esta semana">🗂 ${erronkaSemana.nombre}</span>` : ''}
+                </div>
                 <div class="week-days">${pills}</div>
                 <div class="week-stats">
                     <span class="week-stat">
@@ -505,6 +515,7 @@ const UI = {
                 : '—';
             const color   = CONFIG.colors[f.asignatura] || '#64748b';
             const esJusti = f.tipo === 'justificada';
+            const erronka = f.fecha ? erronkaForDate(f.fecha) : null;
 
             return `
             <div class="falta-item">
@@ -515,6 +526,7 @@ const UI = {
                         <span>${fecha}</span>·<span>${f.horas}h</span>
                         <span class="falta-item__eval-badge">E${f.evaluacion || '?'}</span>
                         <span class="tipo-badge ${esJusti ? 'tipo-j' : 'tipo-i'}">${esJusti ? 'J' : 'I'}</span>
+                        ${erronka ? `<span class="tipo-badge tipo-erronka" title="${erronka.nombre}">🗂</span>` : ''}
                     </div>
                     ${f.nota ? `<div class="falta-item__nota">${f.nota}</div>` : ''}
                 </div>
@@ -1766,6 +1778,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     autoSetEval();
     populateAsigSelects();
+    populateErronkaSelect();
     initEvents();
     UI.render();
     initFirebaseFaltas();

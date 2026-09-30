@@ -151,7 +151,7 @@
         <div id="tab-calculadora" class="tab-panel panel">
             <div class="panel-inner">
                 <h2 class="panel__title">Calculadora predictiva</h2>
-                <p class="panel__subtitle">Simula qué estado tendría una asignatura si faltas más horas</p>
+                <p class="panel__subtitle">Simula qué estado tendría una asignatura si faltas más horas · Opcionalmente puedes ver el impacto en una erronka</p>
                 <div class="calc-form">
                     <div class="field">
                         <label for="calc-asignatura">Asignatura</label>
@@ -162,6 +162,12 @@
                     <div class="field">
                         <label for="calc-horas">Horas a simular</label>
                         <input type="number" id="calc-horas" min="1" max="30" value="2">
+                    </div>
+                    <div class="field">
+                        <label for="calc-erronka">Erronka (opcional)</label>
+                        <select id="calc-erronka">
+                            <option value="">— Ninguna —</option>
+                        </select>
                     </div>
                     <button id="btn-simular" class="btn-primary">Simular</button>
                 </div>
