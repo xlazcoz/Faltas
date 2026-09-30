@@ -1,7 +1,7 @@
 {
   "name": "Control de Asistencia — CIFP USURBIL",
   "short_name": "Asistencia",
-  "description": "Control de faltas 1DDAW3 Web Aplikazioen Garapena",
+  "description": "Control de faltas 2DDAW3 Web Aplikazioen Garapena",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#080b12",

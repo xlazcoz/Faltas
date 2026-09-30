@@ -1,6 +1,6 @@
-// v2 — network-first: siempre intenta traer la versión más reciente del servidor.
+// v3 — network-first: siempre intenta traer la versión más reciente del servidor.
 // Solo usa la caché si no hay conexión. Así nunca se queda pillado en una versión vieja.
-const CACHE = 'ca-usurbil-v2';
+const CACHE = 'ca-usurbil-v3';
 const SHELL = [
     './index.html',
     './faltas.html',

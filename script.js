@@ -100,147 +100,6 @@ const Trash = {
     }
 };
 
-/* ============================================================
-   DASHBOARD (post-login)
-   ============================================================ */
-const Dashboard = {
-    SHOWN_KEY: 'ca_dash_shown',
-
-    shouldShow() { return !sessionStorage.getItem(this.SHOWN_KEY); },
-    markShown()  { sessionStorage.setItem(this.SHOWN_KEY, '1'); },
-
-    show() {
-        if (!this.shouldShow()) return;
-        this.markShown();
-        const el = document.getElementById('dashboard-overlay');
-        if (!el) return;
-        this.build();
-        el.style.display = 'flex';
-        requestAnimationFrame(() => { el.style.opacity = '1'; });
-    },
-
-    hide() {
-        const el = document.getElementById('dashboard-overlay');
-        if (!el) return;
-        el.style.opacity = '0';
-        setTimeout(() => { el.style.display = 'none'; }, 350);
-    },
-
-    build() {
-        const content = document.getElementById('dashboard-content');
-        if (!content) return;
-
-        const now = new Date();
-        const ny  = now.getFullYear();
-        const nm  = String(now.getMonth() + 1).padStart(2, '0');
-        const nd  = String(now.getDate()).padStart(2, '0');
-        const hoyStr = `${ny}-${nm}-${nd}`;
-
-        const dashEval = evalForDate(hoyStr);
-
-        // Calculate stats for a subject using dashEval directly (no State mutation)
-        const calcDashStats = (key) => {
-            const asig   = CONFIG.asignaturas[key];
-            const totalH = dashEval === 'total'
-                ? asig.eval[1] + asig.eval[2]
-                : asig.eval[dashEval];
-            const lista  = State.faltas.filter(f =>
-                f.asignatura === key && Number(f.evaluacion) === dashEval
-            );
-            const horasFaltadas  = lista.reduce((s, f) => s + (f.horas || 0), 0);
-            const pct            = totalH > 0 ? (horasFaltadas / totalH) * 100 : 0;
-            const limiteH        = Math.floor(totalH * CONFIG.limitePct / 100);
-            const horasRestantes = Math.max(0, limiteH - horasFaltadas);
-            let estado = 'ok';
-            if (horasFaltadas >= limiteH)          estado = 'danger';
-            else if (horasFaltadas >= limiteH / 2) estado = 'warning';
-            return { pct, horasRestantes, estado };
-        };
-
-        const hour    = now.getHours();
-        const greeting = hour < 12 ? '🌅 Buenos días' : hour < 20 ? '☀️ Buenas tardes' : '🌙 Buenas noches';
-        const dateStr  = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-
-        // Today's classes
-        const tdHoy   = tipoDia(hoyStr);
-        const hoyAsig = tdHoy ? [] : asignaturasDelDia(now);
-
-        // At-risk subjects using dashEval
-        const enRiesgo = Object.keys(CONFIG.asignaturas).filter(k => calcDashStats(k).estado !== 'ok');
-
-        // This week's absences
-        const dow = now.getDay();
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
-        weekStart.setHours(0, 0, 0, 0);
-        const thisWeekFaltas = State.faltas.filter(f => {
-            if (!f.fecha) return false;
-            const fd = new Date(f.fecha + 'T00:00:00');
-            return fd >= weekStart && fd <= now;
-        });
-        const horasEstaSemana = thisWeekFaltas.reduce((s, f) => s + (f.horas || 0), 0);
-
-        // Today's classes HTML
-        let clasesHTML;
-        if (tdHoy) {
-            const icons = { festivo: '🎉 Hoy es festivo', examen: '📝 Semana de exámenes', practica: '🏢 Prácticas de empresa' };
-            clasesHTML = `<div class="dash-no-class">${icons[tdHoy.tipo] || 'No hay clase hoy'}</div>`;
-        } else if (hoyAsig.length === 0) {
-            clasesHTML = '<div class="dash-no-class">No hay clase hoy</div>';
-        } else {
-            clasesHTML = hoyAsig.map(k => {
-                const color = CONFIG.colors[k] || '#64748b';
-                const horas = CONFIG.horasDiarias[now.getDay()]?.[k] || 0;
-                return `<div class="dash-class-pill" style="border-color:${color}30;background:${color}10">
-                    <span class="td-dot" style="background:${color};box-shadow:0 0 5px ${color};width:8px;height:8px;border-radius:50%;display:inline-block"></span>
-                    <span style="font-weight:600">${k}</span>
-                    <span style="color:var(--txt-muted);font-size:0.75rem;font-family:var(--font-mono)">${horas}h</span>
-                </div>`;
-            }).join('');
-        }
-
-        // At-risk HTML
-        const riesgoHTML = enRiesgo.length === 0
-            ? '<div class="dash-ok">✅ Todas las asignaturas en estado correcto</div>'
-            : enRiesgo.map(k => {
-                const s = calcDashStats(k);
-                const color = s.estado === 'danger' ? 'var(--red)' : 'var(--amber)';
-                const icon  = s.estado === 'danger' ? '⛔' : '⚠️';
-                return `<div class="dash-alert-item" style="border-color:${s.estado === 'danger' ? 'rgba(255,64,96,0.25)' : 'rgba(255,184,48,0.25)'}">
-                    <span>${icon}</span>
-                    <span style="font-weight:600;color:${color}">${CONFIG.asignaturas[k].nombre.replace(/\s*\(.*\)/, '')}</span>
-                    <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--txt-secondary);margin-left:auto">${s.pct.toFixed(1)}% — quedan ${s.horasRestantes}h</span>
-                </div>`;
-            }).join('');
-
-        content.innerHTML = `
-            <div class="dash-greeting">${greeting}</div>
-            <div class="dash-date">${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}</div>
-
-            <div class="dash-cols">
-                <div class="dash-section">
-                    <div class="dash-section-title">Hoy tienes clase de</div>
-                    <div class="dash-classes">${clasesHTML}</div>
-                </div>
-                <div class="dash-section">
-                    <div class="dash-section-title">Esta semana</div>
-                    <div class="dash-week-stat">
-                        <span class="dash-week-num" style="color:${horasEstaSemana > 0 ? 'var(--red)' : 'var(--lime)'}">${horasEstaSemana}h</span>
-                        <span class="dash-week-label">faltadas</span>
-                        <span class="dash-week-num">${thisWeekFaltas.length}</span>
-                        <span class="dash-week-label">registros</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="dash-section">
-                <div class="dash-section-title">Estado de asignaturas <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--txt-muted)">(Eval ${dashEval})</span></div>
-                <div class="dash-alerts">${riesgoHTML}</div>
-            </div>
-        `;
-    }
-};
-
 const WeekSummary = {
     render() {
         const container = document.getElementById('week-summary');
@@ -420,7 +279,7 @@ function initFirebaseFaltas() {
    ============================================================ */
 const State = {
     faltas: [],
-    evaluacion: 1,        // 1 | 2 | 3 | 'total'
+    evaluacion: 1,        // 1 | 2 | 'total'
     filtroActivo: 'all',
     activeTab: 'resumen',
     calYear: new Date().getFullYear(),
@@ -439,6 +298,22 @@ const State = {
             lista  = this.faltas.filter(f => f.asignatura === key && Number(f.evaluacion) === this.evaluacion);
         }
 
+        const horasFaltadas  = lista.reduce((s, f) => s + (f.horas || 0), 0) + extraHoras;
+        const pct            = totalH > 0 ? (horasFaltadas / totalH) * 100 : 0;
+        const limiteH        = Math.floor(totalH * CONFIG.limitePct / 100);
+        const horasRestantes = Math.max(0, limiteH - horasFaltadas);
+
+        let estado = 'ok';
+        if (horasFaltadas >= limiteH)          estado = 'danger';
+        else if (horasFaltadas >= limiteH / 2) estado = 'warning';
+
+        return { horasFaltadas, totalH, pct, limiteH, horasRestantes, estado };
+    },
+
+    /** Stats agregadas de una erronka (solo lectura): suma TODAS las asignaturas en su periodo */
+    calcErronkaStats(er, extraHoras = 0) {
+        const totalH = er.totalHoras || 0;
+        const lista  = this.faltas.filter(f => f.fecha >= er.start && f.fecha <= er.end);
         const horasFaltadas  = lista.reduce((s, f) => s + (f.horas || 0), 0) + extraHoras;
         const pct            = totalH > 0 ? (horasFaltadas / totalH) * 100 : 0;
         const limiteH        = Math.floor(totalH * CONFIG.limitePct / 100);
@@ -549,6 +424,69 @@ const UI = {
         </table>`;
     },
 
+    renderErronkas() {
+        const container = document.getElementById('tabla-erronkas');
+        if (!container) return;
+
+        let erronkas = CONFIG.erronkas;
+        if (State.evaluacion !== 'total') {
+            erronkas = erronkas.filter(er => er.evaluacion === State.evaluacion);
+        }
+
+        let rowsHTML = '';
+        erronkas.forEach(er => {
+            const s = State.calcErronkaStats(er);
+            if (State.filtroActivo === 'warning' && s.estado !== 'warning') return;
+            if (State.filtroActivo === 'danger'  && s.estado !== 'danger')  return;
+
+            const trClass   = s.estado === 'danger'  ? 'tr-danger'  : s.estado === 'warning' ? 'tr-warning' : '';
+            const bdgClass  = s.estado === 'danger'  ? 'badge--danger' : s.estado === 'warning' ? 'badge--warning' : 'badge--ok';
+            const bdgLabel  = s.estado === 'danger'  ? '⛔ Peligro'  : s.estado === 'warning' ? '⚠ Riesgo'   : '✓ Correcto';
+            const fillClass = s.estado === 'danger'  ? 'progress-fill--danger' : s.estado === 'warning' ? 'progress-fill--warn' : '';
+            const fillPct   = Math.min(100, s.limiteH > 0 ? (s.horasFaltadas / s.limiteH * 100) : 0).toFixed(0);
+            const quedanColor = s.horasRestantes === 0 ? 'var(--red)' : 'var(--lime)';
+
+            const fIni = new Date(er.start + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            const fFin = new Date(er.end   + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+
+            rowsHTML += `
+            <tr class="${trClass}">
+                <td><div class="td-asig"><span class="td-dot td-dot--erronka"></span>${er.nombre}</div></td>
+                <td class="td-mono">${fIni} → ${fFin}</td>
+                <td class="td-mono">${s.horasFaltadas} / ${s.totalH}h</td>
+                <td>
+                    <div class="progress-wrap">
+                        <div class="progress-bar"><div class="progress-fill ${fillClass}" style="width:${fillPct}%"></div></div>
+                        <span class="progress-pct td-mono">${s.pct.toFixed(1)}%</span>
+                    </div>
+                </td>
+                <td><span class="badge ${bdgClass}">${bdgLabel}</span></td>
+                <td class="td-mono">${s.limiteH}h máx</td>
+                <td class="td-mono" style="color:${quedanColor};">${s.horasRestantes === 0 ? '⚠ 0h' : `+${s.horasRestantes}h`}</td>
+            </tr>`;
+        });
+
+        if (!rowsHTML) {
+            rowsHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--txt-muted);">Sin resultados para este filtro</td></tr>`;
+        }
+
+        container.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Erronka</th>
+                    <th>Periodo</th>
+                    <th>Horas</th>
+                    <th>Progreso</th>
+                    <th>Estado</th>
+                    <th>Límite (20%)</th>
+                    <th>Disponibles</th>
+                </tr>
+            </thead>
+            <tbody>${rowsHTML}</tbody>
+        </table>`;
+    },
+
     renderHistorial() {
         const container = document.getElementById('lista-faltas-container');
         if (!container) return;
@@ -619,21 +557,54 @@ const UI = {
         }
         if (window._chartInstance) { window._chartInstance.destroy(); window._chartInstance = null; }
 
-        const keys   = Object.keys(CONFIG.asignaturas);
-        const labels = keys.map(k => CONFIG.asignaturas[k].nombre.replace(/\s*\(.*\)/, ''));
+        // Entradas del gráfico: asignaturas + erronkas (según la evaluación activa)
+        const entries = [];
 
-        const data = keys.map(k => parseFloat(State.calcStats(k).pct.toFixed(1)));
+        Object.entries(CONFIG.asignaturas).forEach(([key, asig]) => {
+            const s = State.calcStats(key);
+            entries.push({
+                label: asig.nombre.replace(/\s*\(.*\)/, ''),
+                pct: s.pct,
+                horasFaltadas: s.horasFaltadas,
+                totalH: s.totalH,
+                horasRestantes: s.horasRestantes,
+                estado: s.estado,
+                isErronka: false,
+                periodo: null
+            });
+        });
 
-        const bgColors = keys.map(k => {
-            const s = State.calcStats(k);
-            if (s.estado === 'danger')  return 'rgba(255,64,96,0.65)';
-            if (s.estado === 'warning') return 'rgba(255,184,48,0.65)';
+        let erronkasChart = CONFIG.erronkas;
+        if (State.evaluacion !== 'total') {
+            erronkasChart = erronkasChart.filter(er => er.evaluacion === State.evaluacion);
+        }
+        erronkasChart.forEach(er => {
+            const s = State.calcErronkaStats(er);
+            const fIni = new Date(er.start + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            const fFin = new Date(er.end   + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            entries.push({
+                label: '🗂 ' + er.nombre,
+                pct: s.pct,
+                horasFaltadas: s.horasFaltadas,
+                totalH: s.totalH,
+                horasRestantes: s.horasRestantes,
+                estado: s.estado,
+                isErronka: true,
+                periodo: `${fIni} → ${fFin}`
+            });
+        });
+
+        const labels   = entries.map(e => e.label);
+        const data     = entries.map(e => parseFloat(e.pct.toFixed(1)));
+
+        const bgColors = entries.map(e => {
+            if (e.estado === 'danger')  return 'rgba(255,64,96,0.65)';
+            if (e.estado === 'warning') return 'rgba(255,184,48,0.65)';
             return 'rgba(57,255,110,0.65)';
         });
-        const bdColors = keys.map(k => {
-            const s = State.calcStats(k);
-            if (s.estado === 'danger')  return '#ff4060';
-            if (s.estado === 'warning') return '#ffb830';
+        const bdColors = entries.map(e => {
+            if (e.estado === 'danger')  return '#ff4060';
+            if (e.estado === 'warning') return '#ffb830';
             return '#39ff6e';
         });
 
@@ -672,8 +643,10 @@ const UI = {
                     tooltip: {
                         callbacks: {
                             label(ctx) {
-                                const s = State.calcStats(keys[ctx.dataIndex]);
-                                return [`  ${s.pct.toFixed(1)}% faltado`, `  ${s.horasFaltadas}h de ${s.totalH}h`, `  Quedan: ${s.horasRestantes}h`];
+                                const e = entries[ctx.dataIndex];
+                                const lines = [`  ${e.pct.toFixed(1)}% faltado`, `  ${e.horasFaltadas}h de ${e.totalH}h`, `  Quedan: ${e.horasRestantes}h`];
+                                if (e.isErronka && e.periodo) lines.push(`  ${e.periodo}`);
+                                return lines;
                             },
                             title(ctx) { return ctx[0].label; }
                         },
@@ -825,6 +798,7 @@ const UI = {
     render() {
         this.renderTabs();
         this.renderTabla();
+        this.renderErronkas();
         this.renderHistorial();
         this.renderStats();
         WeekSummary.render();
@@ -930,7 +904,8 @@ const Actions = {
             } else if (statsAfter.estado === 'warning' && statsBefore.estado !== 'warning') {
                 Toast.show(`⚠ A mitad del límite en ${CONFIG.asignaturas[asignatura].nombre.replace(/\s*\(.*\)/, '')}`, 'info', 4500);
             } else {
-                Toast.show(`Falta registrada (Eval ${evaluacion})`, 'success');
+                const erronka = erronkaForDate(fecha);
+                Toast.show(`Falta registrada (Eval ${evaluacion})${erronka ? ' · ' + erronka.nombre : ''}`, 'success');
             }
         } catch(e) { console.error(e); Toast.show('Error al guardar', 'error'); }
     },
@@ -1044,6 +1019,7 @@ const Actions = {
         State.filtroActivo = filtro;
         document.querySelectorAll('.btn-filter').forEach(b => b.classList.toggle('active', b.dataset.filter === filtro));
         UI.renderTabla();
+        UI.renderErronkas();
     },
 
     guardarConfigFirebase() {
@@ -1217,8 +1193,10 @@ const Actions = {
     },
 
     simular() {
-        const key   = document.getElementById('calc-asignatura').value;
-        const horas = parseInt(document.getElementById('calc-horas').value);
+        const key        = document.getElementById('calc-asignatura').value;
+        const horas      = parseInt(document.getElementById('calc-horas').value);
+        const erronkaSel = document.getElementById('calc-erronka');
+        const erronkaIdx = erronkaSel ? erronkaSel.value : '';
 
         if (!key)                      return Toast.show('Selecciona una asignatura', 'error');
         if (isNaN(horas) || horas < 1) return Toast.show('Horas inválidas', 'error');
@@ -1228,6 +1206,7 @@ const Actions = {
         const despues = State.calcStats(key, horas);
         const asig    = CONFIG.asignaturas[key];
         const color   = CONFIG.colors[key] || '#64748b';
+        const erronka = erronkaIdx !== '' ? CONFIG.erronkas[parseInt(erronkaIdx)] : null;
 
         const estadoIcon  = s => s.estado === 'danger' ? '⛔' : s.estado === 'warning' ? '⚠️' : '✅';
         const estadoLabel = s => s.estado === 'danger' ? 'Peligro' : s.estado === 'warning' ? 'Riesgo' : 'Correcto';
@@ -1279,6 +1258,65 @@ const Actions = {
             alertaHTML = `
             <div class="calc-alert calc-alert--ok">
                 ✅ <strong>Sin cambio de estado.</strong> Seguirías en ${estadoLabel(despues)}. Te quedarían <strong>${margenDespues}h</strong> de margen.
+            </div>`;
+        }
+
+        // Bloque de erronka (opcional): impacto de la simulación en la erronka seleccionada
+        let erronkaHTML = '';
+        if (erronka) {
+            const fIni = new Date(erronka.start + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            const fFin = new Date(erronka.end   + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            const eAntes   = State.calcErronkaStats(erronka);
+            const eDespues = State.calcErronkaStats(erronka, horas);
+
+            erronkaHTML = `
+            <div class="calc-erronka-divider"></div>
+
+            <div class="calc-asig-header">
+                <span class="td-dot td-dot--erronka" style="width:12px;height:12px;border-radius:50%;display:inline-block"></span>
+                <strong style="font-family:var(--font-display);font-size:1.05rem">${erronka.nombre}</strong>
+                <span style="color:var(--txt-secondary);font-size:0.82rem;font-family:var(--font-mono)">${fIni} → ${fFin}</span>
+            </div>
+
+            <div class="calc-compare">
+                <div class="calc-card">
+                    <span class="calc-card__label">Estado actual</span>
+                    <div style="display:flex;align-items:baseline;gap:8px;margin:10px 0 4px">
+                        <span class="calc-card__hours">${eAntes.horasFaltadas}h</span>
+                        <span style="color:var(--txt-muted);font-family:var(--font-mono);font-size:0.82rem">/ ${eAntes.limiteH}h límite</span>
+                    </div>
+                    <span class="badge ${badgeCls(eAntes)}">${estadoIcon(eAntes)} ${estadoLabel(eAntes)}</span>
+                    ${pBar(eAntes.horasFaltadas, eAntes.limiteH, eAntes.estado)}
+                    <div style="margin-top:10px;font-family:var(--font-mono);font-size:0.75rem;color:var(--txt-secondary)">
+                        Disponibles: <span style="color:${estadoColor(eAntes)};font-weight:700">${eAntes.horasRestantes}h</span>
+                    </div>
+                </div>
+
+                <div class="calc-arrow">→</div>
+
+                <div class="calc-card calc-card--projected">
+                    <span class="calc-card__label">Tras faltar ${horas}h</span>
+                    <div style="display:flex;align-items:baseline;gap:8px;margin:10px 0 4px">
+                        <span class="calc-card__hours" style="color:${estadoColor(eDespues)}">${eDespues.horasFaltadas}h</span>
+                        <span style="color:var(--txt-muted);font-family:var(--font-mono);font-size:0.82rem">/ ${eDespues.limiteH}h límite</span>
+                    </div>
+                    <span class="badge ${badgeCls(eDespues)}">${estadoIcon(eDespues)} ${estadoLabel(eDespues)}</span>
+                    ${pBar(eDespues.horasFaltadas, eDespues.limiteH, eDespues.estado)}
+                    <div style="margin-top:10px;font-family:var(--font-mono);font-size:0.75rem;color:var(--txt-secondary)">
+                        Disponibles: <span style="color:${estadoColor(eDespues)};font-weight:700">${eDespues.horasRestantes}h</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="calc-stats-row">
+                <div class="calc-stat">
+                    <span class="calc-stat__label">Margen restante (erronka)</span>
+                    <span class="calc-stat__val" style="color:${estadoColor(eDespues)}">${eDespues.horasRestantes}h</span>
+                </div>
+                <div class="calc-stat">
+                    <span class="calc-stat__label">% faltado (erronka)</span>
+                    <span class="calc-stat__val">${eDespues.pct.toFixed(1)}%</span>
+                </div>
             </div>`;
         }
 
@@ -1345,12 +1383,186 @@ const Actions = {
                 </div>
             </div>
 
+            ${erronkaHTML}
             ${alertaHTML}
         `;
     }
 };
 
 window.Actions = Actions;
+
+/* ============================================================
+   AJUSTES DEL CURSO (pantalla para editar fechas)
+   ============================================================ */
+const ConfigSettings = {
+    open() {
+        this.build();
+        document.getElementById('config-modal').classList.add('open');
+    },
+    close() {
+        document.getElementById('config-modal').classList.remove('open');
+    },
+
+    build() {
+        const el = document.getElementById('config-content');
+        if (!el) return;
+
+        const evalsHTML = Object.keys(CONFIG.evalInicio).map(n => `
+            <div class="cfg-group">
+                <div class="cfg-group__title">Evaluación ${n}</div>
+                <div class="cfg-grid">
+                    <div class="field">
+                        <label>Inicio</label>
+                        <input type="date" data-cfg="evalInicio-${n}" value="${CONFIG.evalInicio[n]}">
+                    </div>
+                    <div class="field">
+                        <label>Fin</label>
+                        <input type="date" data-cfg="evalFin-${n}" value="${CONFIG.evalFin[n]}">
+                    </div>
+                </div>
+            </div>`).join('');
+
+        const erronkasHTML = CONFIG.erronkas.map(er => `
+            <div class="cfg-row" data-cfg-row="erronka">
+                <input type="text" class="cfg-row__name" data-name placeholder="Nombre" value="${er.nombre}">
+                <input type="date" data-start value="${er.start}">
+                <span class="cfg-row__sep">→</span>
+                <input type="date" data-end value="${er.end}">
+                <button type="button" class="btn-micro btn-micro--danger" data-remove title="Quitar">✕</button>
+            </div>`).join('');
+
+        const festivosHTML = CONFIG.festivosRangos.map(r => `
+            <div class="cfg-row" data-cfg-row="festivo">
+                <input type="date" data-start value="${r[0]}">
+                <span class="cfg-row__sep">→</span>
+                <input type="date" data-end value="${r[1]}">
+                <button type="button" class="btn-micro btn-micro--danger" data-remove title="Quitar">✕</button>
+            </div>`).join('');
+
+        el.innerHTML = `
+            <p class="modal-hint">Personaliza las fechas del curso. Se guardan en este dispositivo y se aplican a Faltas y Horario.</p>
+
+            <div class="cfg-section">
+                <h4 class="cfg-section__title">📅 Evaluaciones</h4>
+                ${evalsHTML}
+            </div>
+
+            <div class="cfg-section">
+                <h4 class="cfg-section__title">🗂 Erronkas</h4>
+                <div class="cfg-list" id="cfg-erronkas">${erronkasHTML}</div>
+                <button type="button" class="btn-ghost btn-sm" id="cfg-add-erronka">+ Añadir erronka</button>
+            </div>
+
+            <div class="cfg-section">
+                <h4 class="cfg-section__title">🏢 Prácticas (FCT)</h4>
+                <div class="cfg-grid">
+                    <div class="field">
+                        <label>Inicio</label>
+                        <input type="date" data-cfg="practicas-start" value="${CONFIG.practicas.start}">
+                    </div>
+                    <div class="field">
+                        <label>Fin</label>
+                        <input type="date" data-cfg="practicas-end" value="${CONFIG.practicas.end}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="cfg-section">
+                <h4 class="cfg-section__title">🎉 Festivos (rangos)</h4>
+                <div class="cfg-list" id="cfg-festivos">${festivosHTML}</div>
+                <button type="button" class="btn-ghost btn-sm" id="cfg-add-festivo">+ Añadir festivo</button>
+            </div>
+
+            <div class="confirm-buttons" style="margin-top:8px">
+                <button type="button" class="btn-danger-ghost" id="cfg-reset">↺ Restablecer por defecto</button>
+                <span style="flex:1"></span>
+                <button type="button" class="btn-ghost" id="cfg-cancel">Cancelar</button>
+                <button type="button" class="btn-primary" id="cfg-save">💾 Guardar</button>
+            </div>`;
+
+        document.getElementById('cfg-add-erronka').addEventListener('click', () => this.addRow('erronka'));
+        document.getElementById('cfg-add-festivo').addEventListener('click', () => this.addRow('festivo'));
+        document.getElementById('cfg-cancel').addEventListener('click', () => this.close());
+        document.getElementById('cfg-save').addEventListener('click', () => this.save());
+        document.getElementById('cfg-reset').addEventListener('click', () => this.reset());
+
+        el.querySelectorAll('[data-remove]').forEach(b => {
+            b.addEventListener('click', () => b.closest('.cfg-row').remove());
+        });
+    },
+
+    addRow(tipo) {
+        const wrap = document.getElementById(tipo === 'erronka' ? 'cfg-erronkas' : 'cfg-festivos');
+        const div = document.createElement('div');
+        div.className = 'cfg-row';
+        div.dataset.cfgRow = tipo;
+
+        const nameInput = tipo === 'erronka'
+            ? `<input type="text" class="cfg-row__name" data-name placeholder="Nombre" value="Nueva Erronka">`
+            : '';
+
+        div.innerHTML = `
+            ${nameInput}
+            <input type="date" data-start>
+            <span class="cfg-row__sep">→</span>
+            <input type="date" data-end>
+            <button type="button" class="btn-micro btn-micro--danger" data-remove title="Quitar">✕</button>`;
+        div.querySelector('[data-remove]').addEventListener('click', () => div.remove());
+        wrap.appendChild(div);
+    },
+
+    save() {
+        const val = dataCfg => {
+            const inp = document.querySelector(`[data-cfg="${dataCfg}"]`);
+            return inp ? inp.value : '';
+        };
+
+        const evalInicio = {}, evalFin = {};
+        for (const n of Object.keys(CONFIG.evalInicio)) {
+            evalInicio[n] = val(`evalInicio-${n}`);
+            evalFin[n]    = val(`evalFin-${n}`);
+        }
+
+        const erronkas = [];
+        document.querySelectorAll('#cfg-erronkas .cfg-row').forEach(row => {
+            const nombre = row.querySelector('[data-name]').value.trim();
+            const start  = row.querySelector('[data-start]').value;
+            const end    = row.querySelector('[data-end]').value;
+            if (nombre && start && end) erronkas.push({ nombre, start, end });
+        });
+
+        const festivosRangos = [];
+        document.querySelectorAll('#cfg-festivos .cfg-row').forEach(row => {
+            const start = row.querySelector('[data-start]').value;
+            const end   = row.querySelector('[data-end]').value;
+            if (start && end) festivosRangos.push([start, end]);
+        });
+
+        const practicas = {
+            start: val('practicas-start'),
+            end:   val('practicas-end'),
+            label: CONFIG.practicas.label
+        };
+
+        // Validación mínima
+        for (const n of Object.keys(evalInicio)) {
+            if (!evalInicio[n] || !evalFin[n]) return Toast.show(`Completa las fechas de la evaluación ${n}`, 'error');
+            if (evalInicio[n] > evalFin[n])    return Toast.show(`La evaluación ${n} tiene el inicio posterior al fin`, 'error');
+        }
+        if (!practicas.start || !practicas.end) return Toast.show('Completa las fechas de prácticas', 'error');
+        if (erronkas.length === 0) return Toast.show('Añade al menos una erronka', 'error');
+
+        guardarConfigCurso({ evalInicio, evalFin, erronkas, festivosRangos, practicas });
+        Toast.show('Ajustes guardados. Recargando…', 'success');
+        setTimeout(() => location.reload(), 900);
+    },
+
+    reset() {
+        resetearConfigCurso();
+        Toast.show('Valores por defecto restaurados. Recargando…', 'success');
+        setTimeout(() => location.reload(), 900);
+    }
+};
 
 /* ============================================================
    9. EVENTOS
@@ -1462,6 +1674,11 @@ function initEvents() {
     document.getElementById('modal-backdrop').addEventListener('click', () => Modals.firebase.close());
     document.getElementById('btn-guardar-config').addEventListener('click', () => Actions.guardarConfigFirebase());
 
+    // Ajustes del curso (fechas)
+    document.getElementById('btn-ajustes').addEventListener('click',    () => ConfigSettings.open());
+    document.getElementById('config-close').addEventListener('click',    () => ConfigSettings.close());
+    document.getElementById('config-backdrop').addEventListener('click', () => ConfigSettings.close());
+
     // Edit modal
     document.getElementById('edit-close').addEventListener('click',   () => Modals.edit.close());
     document.getElementById('edit-cancel').addEventListener('click',  () => Modals.edit.close());
@@ -1492,7 +1709,7 @@ function initEvents() {
         if (e.key !== 'Escape') return;
         Modals.registro.close(); Modals.firebase.close();
         Modals.confirm.close(false); Modals.edit.close();
-        Modals.trash.close();
+        Modals.trash.close(); ConfigSettings.close();
         document.getElementById('shortcuts-modal')?.classList.remove('open');
     });
 }
@@ -1509,6 +1726,16 @@ function populateAsigSelects() {
             .join('');
         sel.innerHTML = placeholderHTML + optionsHTML;
     });
+}
+
+function populateErronkaSelect() {
+    const sel = document.getElementById('calc-erronka');
+    if (!sel) return;
+    const placeholder = sel.querySelector('option[value=""]');
+    const optionsHTML = CONFIG.erronkas
+        .map((er, i) => `<option value="${i}">${er.nombre}</option>`)
+        .join('');
+    sel.innerHTML = (placeholder ? placeholder.outerHTML : '') + optionsHTML;
 }
 
 function autoSetEval() {

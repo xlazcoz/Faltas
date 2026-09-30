@@ -92,9 +92,8 @@ const CONFIG = {
     // Solo 2 evaluaciones este curso
     numEvaluaciones: 2,
 
-    // El viernes 4 de sept ya es lectivo normal este curso, cuenta desde ese día.
-    // La 2ª eval se extiende hasta el 27 de feb (última semana de clase antes de las prácticas).
-    // Curso 2026-2027
+    // Curso 2026-2027. Estos valores son los POR DEFECTO; se pueden editar
+    // desde la pantalla "Ajustes del curso" y se guardan en este dispositivo.
     evalInicio: { 1: '2026-09-04', 2: '2026-11-16' },
     evalFin:    { 1: '2026-11-13', 2: '2027-02-27' },
 
@@ -104,32 +103,29 @@ const CONFIG = {
         { start: '2027-02-15', end: '2027-02-19', label: 'Semana de exámenes 2ª Eval' },
     ],
 
-    // Festivos individuales y rangos — estos SÍ se excluyen de las horas
-    festivos: (() => {
-        const dias = [];
-        const rango = (inicio, fin) => {
-            const d = new Date(inicio + 'T00:00:00');
-            const f = new Date(fin   + 'T00:00:00');
-            while (d <= f) {
-                const y  = d.getFullYear();
-                const m  = String(d.getMonth() + 1).padStart(2, '0');
-                const dd = String(d.getDate()).padStart(2, '0');
-                dias.push(`${y}-${m}-${dd}`);
-                d.setDate(d.getDate() + 1);
-            }
-        };
-        rango('2026-10-12', '2026-10-12'); // Día de la Hispanidad
-        rango('2026-12-07', '2026-12-08'); // Puente Constitución + Inmaculada
-        rango('2026-12-19', '2027-01-06'); // Navidades + Reyes
-        rango('2027-01-20', '2027-01-20'); // Tamborrada
-        rango('2027-02-08', '2027-02-14'); // Semana de Carnaval
-        rango('2027-03-25', '2027-03-26'); // Jueves y Viernes Santo
-        rango('2027-03-29', '2027-03-29'); // Lunes de Pascua (Aberri Eguna)
-        return dias;
-    })(),
+    // Festivos como rangos [inicio, fin] — editables. Se expanden a CONFIG.festivos más abajo.
+    festivosRangos: [
+        ['2026-10-12', '2026-10-12'], // Día de la Hispanidad
+        ['2026-12-07', '2026-12-08'], // Puente Constitución + Inmaculada
+        ['2026-12-19', '2027-01-06'], // Navidades + Reyes
+        ['2027-01-20', '2027-01-20'], // Tamborrada
+        ['2027-02-08', '2027-02-14'], // Semana de Carnaval
+        ['2027-03-25', '2027-03-26'], // Jueves y Viernes Santo
+        ['2027-03-29', '2027-03-29'], // Lunes de Pascua (Aberri Eguna)
+    ],
 
-    // Prácticas de empresa (FCT) — 3 meses desde el 1 de marzo (la semana del 22-27 feb sigue siendo lectiva y cuenta para las faltas)
+    // Prácticas de empresa (FCT)
     practicas: { start: '2027-03-01', end: '2027-05-28', label: 'Prácticas en empresa (FCT)' },
+
+    // ERRONKAS: periodos que agrupan TODAS las asignaturas.
+    // Cada falta se suma automáticamente a la erronka de su fecha.
+    // totalHoras y evaluacion se calculan más abajo (vista de solo lectura).
+    erronkas: [
+        { nombre: '6. Erronka', start: '2026-09-04', end: '2026-09-08' },
+        { nombre: '7. Erronka', start: '2026-09-09', end: '2026-11-13' },
+        { nombre: '8. Erronka', start: '2026-11-16', end: '2027-01-15' },
+        { nombre: '9. Erronka', start: '2027-01-18', end: '2027-02-19' },
+    ],
 
     // Horas por asignatura cada día de la semana — derivado del horario real
     horasDiarias: derivarHorasDiarias(),
@@ -137,7 +133,10 @@ const CONFIG = {
     horario: HORARIO_BLOQUES,
 
     // Se rellena más abajo con las horas totales calculadas por evaluación
-    asignaturas: {}
+    asignaturas: {},
+
+    // Lista plana de días festivos (derivada de festivosRangos)
+    festivos: []
 };
 
 /* ============================================================
@@ -205,9 +204,68 @@ function horasLectivasRestantes(key, evalNum) {
     return computeHorasEnRango(key, `${y}-${m}-${d}`, finStr);
 }
 
+/* ============================================================
+   CONFIGURACIÓN PERSONALIZADA (pantalla "Ajustes del curso")
+   Se guarda en localStorage y se aplica sobre los valores por defecto.
+   ============================================================ */
+const CONFIG_STORAGE_KEY = 'ca_config_curso';
+
+function cargarConfigCurso() {
+    try {
+        const d = JSON.parse(localStorage.getItem(CONFIG_STORAGE_KEY));
+        return d && typeof d === 'object' ? d : {};
+    } catch(e) { return {}; }
+}
+function guardarConfigCurso(data) {
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(data));
+}
+function resetearConfigCurso() {
+    localStorage.removeItem(CONFIG_STORAGE_KEY);
+}
+
+// Aplica la configuración guardada por el usuario sobre los valores por defecto
+(function aplicarConfigCurso() {
+    const over = cargarConfigCurso();
+    if (over.evalInicio && typeof over.evalInicio === 'object') CONFIG.evalInicio = over.evalInicio;
+    if (over.evalFin   && typeof over.evalFin   === 'object') CONFIG.evalFin   = over.evalFin;
+    if (over.practicas && over.practicas.start) CONFIG.practicas = { ...CONFIG.practicas, ...over.practicas };
+    if (Array.isArray(over.festivosRangos) && over.festivosRangos.length) CONFIG.festivosRangos = over.festivosRangos;
+    if (Array.isArray(over.erronkas) && over.erronkas.length) CONFIG.erronkas = over.erronkas;
+})();
+
+/** Devuelve 1 o 2 según la evaluación a la que pertenece una fecha (YYYY-MM-DD) */
+function evalForDate(dateStr) {
+    if (dateStr >= CONFIG.evalInicio[2]) return 2;
+    return 1;
+}
+
+/** Devuelve la erronka a la que pertenece una fecha, o null si no está en ninguna */
+function erronkaForDate(dateStr) {
+    return CONFIG.erronkas.find(er => dateStr >= er.start && dateStr <= er.end) || null;
+}
+
+/** Expande rangos [inicio, fin] a una lista plana de días YYYY-MM-DD */
+function expandirRangos(rangos) {
+    const dias = [];
+    rangos.forEach(([inicio, fin]) => {
+        const d = new Date(inicio + 'T00:00:00');
+        const f = new Date(fin   + 'T00:00:00');
+        while (d <= f) {
+            const y  = d.getFullYear();
+            const m  = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            dias.push(`${y}-${m}-${dd}`);
+            d.setDate(d.getDate() + 1);
+        }
+    });
+    return dias;
+}
+
+// Festivos en lista plana (derivada de los rangos)
+CONFIG.festivos = expandirRangos(CONFIG.festivosRangos);
+
 // Calcular el total de horas lectivas de cada asignatura por evaluación
-// iterando día a día desde evalInicio a evalFin (respeta festivos que bloquean
-// y semanas de examen que SÍ cuentan este año — misma lógica que "horas restantes").
+// iterando día a día (respeta festivos bloqueantes y cuenta las semanas de examen).
 Object.keys(CONFIG.nombres).forEach(key => {
     CONFIG.asignaturas[key] = {
         nombre: CONFIG.nombres[key],
@@ -218,11 +276,16 @@ Object.keys(CONFIG.nombres).forEach(key => {
     };
 });
 
-/** Devuelve 1 o 2 según la evaluación a la que pertenece una fecha (YYYY-MM-DD) */
-function evalForDate(dateStr) {
-    if (dateStr >= CONFIG.evalInicio[2]) return 2;
-    return 1;
-}
+// Calcular las horas totales de cada erronka: suma de TODAS las asignaturas
+// dentro de su periodo. La erronka es de solo lectura; sus faltas son las de las
+// asignaturas cuyas fechas caen en [start, end].
+CONFIG.erronkas.forEach(er => {
+    const total = Object.keys(CONFIG.nombres).reduce(
+        (sum, key) => sum + computeHorasEnRango(key, er.start, er.end), 0
+    );
+    er.totalHoras = Math.round(total * 10) / 10;
+    er.evaluacion = evalForDate(er.start);
+});
 
 /* ============================================================
    AUTH

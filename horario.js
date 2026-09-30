@@ -543,7 +543,8 @@ async function registrarFaltaDesdeHorario() {
         await DB.faltas.add({ asignatura, fecha, horas, evaluacion, tipo, nota });
         document.getElementById('register-modal').classList.remove('open');
         document.getElementById('nota').value = '';
-        Toast.show(`Falta registrada (Eval ${evaluacion})`, 'success');
+        const erronka = erronkaForDate(fecha);
+        Toast.show(`Falta registrada (Eval ${evaluacion})${erronka ? ' · ' + erronka.nombre : ''}`, 'success');
     } catch(e) { console.error(e); Toast.show('Error al guardar', 'error'); }
 }
 
