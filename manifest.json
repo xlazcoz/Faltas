@@ -1,20 +1,22 @@
 {
-  "name": "Control de Asistencia — CIFP USURBIL",
-  "short_name": "Asistencia",
-  "description": "Control de faltas 2DDAW3 Web Aplikazioen Garapena",
+  "name": "Mi Curso — Asistencia y exámenes",
+  "short_name": "Mi Curso",
+  "description": "Control de faltas, horario, exámenes y calendario para cualquier curso.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#080b12",
-  "theme_color": "#00d4ff",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
   "orientation": "any",
+  "lang": "es",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%2300d4ff'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-weight='900' font-size='96' fill='%23080b12'>CA</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23080b12'/><rect x='20' y='20' width='152' height='152' rx='32' fill='%2300d4ff'/><text x='50%25' y='56%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-weight='900' font-size='82' fill='%23080b12'>CA</text></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%2300d4ff'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-weight='900' font-size='256' fill='%23080b12'>CA</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='108' fill='%23080b12'/><rect x='52' y='52' width='408' height='408' rx='86' fill='%2300d4ff'/><text x='50%25' y='56%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-weight='900' font-size='220' fill='%23080b12'>CA</text></svg>",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"

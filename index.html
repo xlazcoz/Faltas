@@ -3,46 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#00d4ff">
-    <title>CIFP USURBIL — Inicio</title>
+    <meta name="theme-color" content="#0f1115">
+    <title>Inicio — Mi curso</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<!-- ===================== SELECTOR ===================== -->
-<div id="selector-screen">
-    <div class="bg-grid"></div>
-    <div class="selector-wrap">
-        <div class="selector-header">
-            <div class="logo-mark">CA</div>
-            <h1>¿Qué quieres abrir?</h1>
-            <p>CIFP USURBIL · 2DDAW3</p>
-        </div>
-        <div class="selector-cards">
-            <a href="faltas.html" class="selector-card">
-                <div class="selector-card__glow"></div>
-                <div class="selector-card__icon">📋</div>
-                <div class="selector-card__body">
-                    <span class="selector-card__title">Control de<br>Faltas</span>
-                    <span class="selector-card__desc">Registra faltas, consulta tu % por asignatura, calendario y calculadora predictiva</span>
-                    <span class="selector-card__cta">▶ Abrir</span>
-                </div>
-            </a>
-            <a href="horario.html" class="selector-card selector-card--horario">
-                <div class="selector-card__glow"></div>
-                <div class="selector-card__icon">🕐</div>
-                <div class="selector-card__body">
-                    <span class="selector-card__title">Horario</span>
-                    <span class="selector-card__desc">Ve tu horario semanal interactivo, apuntes por asignatura y registra faltas al momento</span>
-                    <span class="selector-card__cta">▶ Abrir</span>
-                </div>
-            </a>
-        </div>
-    </div>
-</div>
-
-<script src="shared.js"></script>
+    <div id="app"></div>
+    <div id="modal-root"></div>
+    <div id="toast-container" aria-live="polite"></div>
+    <noscript>Esta aplicación necesita JavaScript para funcionar.</noscript>
+    <script type="module" src="js/pages/dashboard.js"></script>
 </body>
 </html>
